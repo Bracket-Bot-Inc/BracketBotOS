@@ -14,7 +14,6 @@ setup(
         "sshkeyboard",
         "posix_ipc",
         "numpy",
-        "taichi",
         "pillow",
     ],
 )

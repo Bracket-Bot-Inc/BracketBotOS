@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+from pathlib import Path
+import shutil
+
+DAEMONS_DIR = Path(__file__).resolve().parent / "daemons"
+SYSTEMD_DIR = "/etc/systemd/system"
+
+SERVICE_TEMPLATE = """
+[Unit]
+Description={daemon} Service
+BindsTo=sys-subsystem-net-devices-wlan0.device
+After=network.target NetworkManager.service
+BindsTo=sys-subsystem-net-devices-wlan0.device
+
+[Service]
+Type=oneshot
+ExecStart={setup_script}
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+# these daemons get systemd services
+INSTALL_DAEMONS = {"hotspot"}
+
+
+def check_and_install_nix():
+    if shutil.which("nix"):
+        print("[+] Nix is already installed.")
+        return
+    print("[*] Installing Nix...")
+    subprocess.run(
+        ["bash", "-c", "curl -L https://nixos.org/nix/install | bash"],
+        check=True)
+    bashrc = Path.home() / ".bashrc"
+    append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
+    print(
+        "[!] Nix installation complete."
+    )
+    os.execvp("bash",
+              ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
+
+
+def generate_openssl_cert():
+    cert_dir = Path.home() / ".cert"
+    cert_dir.mkdir(exist_ok=True)
+
+    key_path = cert_dir / "key.pem"
+    cert_path = cert_dir / "cert.pem"
+
+    subprocess.run([
+        "openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048", "-keyout",
+        str(key_path), "-out",
+        str(cert_path), "-days",
+        str(days), "-subj", f"/CN={domain}", "-addext",
+        f"subjectAltName=DNS:{domain},IP:{ip}"
+    ],
+                   check=True)
+
+
+def find_buildable_daemons(root: Path):
+    for p in root.glob("*/default.nix"):
+        daemon = p.parent.name
+        yield daemon, p.parent
+
+
+def build_daemon(path: Path):
+    print(f"Building {path.name}...")
+    subprocess.run(
+        ["nix-build", str(path), "-o",
+         str(path / "result")], check=True)
+
+
+def append_if_not_exists(line, file):
+    file = Path(file)
+    file.touch(exist_ok=True)
+    lines = [
+        l.rstrip("\n") for l in file.read_text().splitlines() if l.strip()
+    ]
+    if any(l.strip() == line.strip() for l in lines):
+        return
+    print(f"Appending to {file}")
+    with file.open("a") as f:
+        f.write(f"\n{line}\n")
+
+
+def add_paths_to_shell_profiles(paths):
+    export_line = "export PATH=" + ":".join(f"{p}/result/bin"
+                                            for p in paths) + ":$PATH"
+    home = Path.home()
+    profiles = [
+        home / ".bashrc",
+    ]
+    for profile in profiles:
+        append_if_not_exists(export_line, profile)
+
+
+def install_service(daemon: str, path: Path):
+    setup_script = f"{path.resolve()}/result/bin/{daemon}"
+    service_file = f"{SYSTEMD_DIR}/{daemon}.service"
+
+    print(f"Installing systemd service for {daemon} at {service_file}")
+    subprocess.run(["sudo", "chmod", "+x", setup_script], check=True)
+
+    service_content = SERVICE_TEMPLATE.format(daemon=daemon,
+                                              setup_script=setup_script)
+    subprocess.run(["sudo", "tee", service_file],
+                   input=service_content.encode(),
+                   check=True)
+
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+    subprocess.run(["sudo", "systemctl", "enable", f"{daemon}.service"],
+                   check=True)
+    subprocess.run(["sudo", "systemctl", "start", f"{daemon}.service"],
+                   check=False)
+    print(f"{daemon} service installed and started.")
+
+
+def main():
+    check_and_install_nix()
+    #generate_openssl_cert()
+
+    built_paths = []
+    for daemon, path in find_buildable_daemons(DAEMONS_DIR):
+        build_daemon(path)
+        built_paths.append(path)
+        if daemon in INSTALL_DAEMONS:
+            install_service(daemon, path)
+        else:
+            print(f"Skipping install for {daemon}")
+
+    if built_paths:
+        add_paths_to_shell_profiles(built_paths)
+
+
+if __name__ == "__main__":
+    main()

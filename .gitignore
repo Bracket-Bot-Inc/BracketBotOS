@@ -1,3 +1,7 @@
+result
+log
+*.rrd
+*.pem
 cache/
 # Python cache files
 __pycache__/

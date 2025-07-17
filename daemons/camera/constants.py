@@ -1,23 +1,24 @@
 from bbos.registry import register
+
 import numpy as np
 
 
 @register
-class CFG_camera_stereo_OV9281:
-    fps: int = 120  # Frames per second (camera supports 120fps at 2560x720 MJPG)
+class stereo:
+    rate: int = 120  # Frames per second (camera supports 120fps at 2560x720 MJPG)
     dev: int = 0  # device id /dev/video<dev>
-    jpeg_quality: int = 80  # JPEG compression quality (1-100)
     width: int = 2560  # stereo image width
     height: int = 720  # stereo image height
+    fov_diag = 180  # degrees
+    r = np.sqrt((width / 2)**2 + height**2)
+    xfov = 147
+    yfov = 83
+    f_x = (width / 2) / (2 * np.tan(np.deg2rad(xfov) / 2))
 
 
 @register
-def camera_stereo_OV9281():
-    return camera_stereo(CFG_camera_stereo_OV9281.width,
-                         CFG_camera_stereo_OV9281.height)
-
-
-def camera_stereo(width, height):
+def camera_jpeg(buflen):
     return [
-        ("stereo", np.uint8, (height, width, 3)),
+        ("bytesused", np.uint32),
+        ("jpeg", np.uint8, buflen),
     ]

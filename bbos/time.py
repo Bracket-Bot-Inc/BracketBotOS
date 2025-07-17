@@ -2,7 +2,7 @@ import numpy as np
 import time
 
 
-class Rate:
+class Time:
 
     def __init__(self, hz, blen=10):
         self._blen = blen
@@ -11,15 +11,22 @@ class Rate:
         self._interval = 1 / hz
         self._stats = {"max": -np.inf, "min": np.inf}
 
-    def tick(self):
+    def tick(self, block=True):
         delay = self._buf[self._i - 1] + self._interval - time.monotonic()
         if (delay > 0):
-            time.sleep(delay)
+            if block:
+                time.sleep(delay)
+            else:
+                return False
         self._buf[self._i] = time.monotonic()
         self._i = (self._i + 1) % self._blen
         if self._i == 0:
             self._stats['min'] = min(self.hz, self._stats['min'])
             self._stats['max'] = max(self.hz, self._stats['max'])
+        return True
+
+    def now(self):
+        return time.monotonic()
 
     @property
     def hz(self):
@@ -28,4 +35,5 @@ class Rate:
 
     @property
     def stats(self):
+        """OS jitter waaaa"""
         return self._stats

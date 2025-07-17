@@ -1,0 +1,58 @@
+#!/usr/bin/env python3
+import subprocess
+from pathlib import Path
+
+SYSTEMD_DIR = "/etc/systemd/system"
+BIN_DIR = "/usr/local/bin"
+
+# Automatically find all daemons by scanning daemons/*/default.nix
+DAEMONS_DIR = Path(__file__).resolve().parent / "daemons"
+
+
+def find_daemon_names():
+    return [p.parent.name for p in DAEMONS_DIR.glob("*/default.nix")]
+
+
+def remove_service(daemon):
+    service_file = Path(SYSTEMD_DIR) / f"{daemon}.service"
+    if service_file.exists():
+        print(f"[=] Stopping {daemon}.service (if running)...")
+        subprocess.run(["sudo", "systemctl", "stop", f"{daemon}.service"],
+                       check=False)
+        print(f"[=] Disabling {daemon}.service (if enabled)...")
+        subprocess.run(["sudo", "systemctl", "disable", f"{daemon}.service"],
+                       check=False)
+        print(f"[+] Removing {service_file}")
+        subprocess.run(["sudo", "rm", "-f", str(service_file)], check=True)
+    else:
+        print(f"[=] Service file {service_file} does not exist, skipping.")
+
+
+def remove_paths_from_shell_profiles():
+    home = Path.home()
+    for profile in [home / ".bashrc", home / ".zshrc"]:
+        if profile.exists():
+            lines = profile.read_text().splitlines()
+            new_lines = [
+                line for line in lines if "Robot Daemons PATH" not in line
+            ]
+            profile.write_text("\n".join(new_lines) + "\n")
+            print(f"Cleaned up {profile}")
+
+
+def main():
+    daemons = find_daemon_names()
+
+    for daemon in daemons:
+        if daemon in ["manager"]:
+            remove_service(daemon)
+
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
+
+    remove_paths_from_shell_profiles()
+
+    print("Uninstall complete.")
+
+
+if __name__ == "__main__":
+    main()

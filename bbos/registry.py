@@ -1,4 +1,5 @@
 # registry.py
+import numpy as np
 from functools import wraps
 from inspect import isclass
 from threading import Lock
@@ -27,17 +28,29 @@ def register(robj):
 
 
 # --- helpers ---------------------------------------------------------------
-def get_type(name: str):
-    return _types[name]
+class Type:
+
+    def __init__(self, name: str):
+        self._name = name
+
+    def __call__(self, *args, **kwargs):
+        return _types[self._name](*args, **kwargs) + [("timestamp", np.float64)
+                                                      ]
 
 
-def get_cfg(name: str):
-    return _config[name]
+class Config:
+
+    def __init__(self, name: str):
+        cfg = _config[name]
+        for k, v in cfg.__dict__.items():
+            if not (k.startswith('__') and k.endswith('__')):
+                setattr(self, k, v)
+        self._name = name
 
 
 def all_types():
-    return _types.ctypey()
+    return {k: v() + [("timestamp", np.float64)] for k, v in _types.items()}
 
 
 def all_cfg():
-    return _config.ctypey()
+    return _config

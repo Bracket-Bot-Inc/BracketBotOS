@@ -18,6 +18,21 @@ let
 in
 
 let 
+  opencvPythonSimd = pkgs.python311.pkgs.opencv4.overrideAttrs (old: {
+    cmakeFlags = (old.cmakeFlags or []) ++ [
+      "-DWITH_OPENCL=ON"
+      "-DWITH_TBB=ON"
+      "-DENABLE_NEON=ON"
+      "-DCPU_BASELINE=NEON"
+      "-DCPU_DISPATCH=NEON_FP16,NEON_BF16,NEON_DOTPROD"
+      "-DENABLE_FAST_MATH=ON"
+      "-DCV_DISABLE_OPTIMIZATION=OFF"
+    ];
+    buildPhase = ''
+      make -j3  # or substitute with fixed number: -j4
+    '';
+  });
+
   gnuplotlib = pkgs.stdenv.mkDerivation rec {
     pname = "gnuplotlib";
     version = "0.0.2";
@@ -238,7 +253,8 @@ pkgs.mkShell {
     python311.pkgs.virtualenv
     python311.pkgs.pip
     python311.pkgs.evdev
-    python311Packages.opencv4
+    #python311.pkgs.opencv4
+    opencvPythonSimd
     zlib
     libGL
     glibc

@@ -1,0 +1,3 @@
+# add wlan0-ap as 5 GHz/2 GHz AP port of your first radio
+ACTION=="add", SUBSYSTEM=="ieee80211", KERNEL=="phy0", \
+  RUN+="/usr/bin/iw phy %k interface add wlan0-ap type __ap"

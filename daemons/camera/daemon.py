@@ -1,6 +1,5 @@
-from bbos.shm import Writer
-from bbos.registry import get_cfg, get_type
-from bbos.time import Rate
+from bbos import Writer, Config, Type, Time
+from bbos.os_utils import Priority, config_realtime_process
 
 import os, time, json, sys
 import numpy as np
@@ -9,11 +8,12 @@ import select
 import v4l2
 import mmap
 import ctypes
-from turbojpeg import decompress, PF
+from turbojpeg import decompress_to, PF
 
 
 def main():
-    CFG = get_cfg("CFG_camera_stereo_OV9281")
+    config_realtime_process(2, Priority.CTRL_HIGH)
+    CFG = Config("stereo")
     fd = os.open(f'/dev/video{CFG.dev}', os.O_RDWR)
 
     # Set format
@@ -29,7 +29,7 @@ def main():
     parm = v4l2.v4l2_streamparm()
     parm.type = v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE
     parm.parm.capture.timeperframe.numerator = 1
-    parm.parm.capture.timeperframe.denominator = CFG.fps
+    parm.parm.capture.timeperframe.denominator = CFG.rate
     fcntl.ioctl(fd, v4l2.VIDIOC_S_PARM, parm)
 
     # Request buffers
@@ -56,8 +56,8 @@ def main():
     buf_type = ctypes.c_int(v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE)
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMON, buf_type)
 
-    r = Rate(CFG.fps)
-    with Writer('/camera_stereo', get_type("camera_stereo_OV9281")) as w:
+    r = Time(CFG.rate)
+    with Writer('/camera.jpeg', lambda: Type("camera_jpeg")(buf.length)) as w:
         while True:
             # Queue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_QBUF, buf)
@@ -66,10 +66,12 @@ def main():
             select.select([fd], [], [])
             # Dequeue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_DQBUF, buf)
-            # Decode
-            stereo = np.array(decompress(mmap_buf[:buf.bytesused], PF.RGB),
-                              copy=False)
-            w['stereo'] = stereo[::-1]
+            stamp = r.now()  # stamp as early as possible
+            with w.buf() as b:
+                b['bytesused'][0] = buf.bytesused
+                b['jpeg'][0, :buf.bytesused] = memoryview(
+                    mmap_buf[:buf.bytesused])
+                b[:]['timestamp'] = stamp
             r.tick()
     # Cleanup
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMOFF, buf_type)
