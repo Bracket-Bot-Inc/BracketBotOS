@@ -14,7 +14,9 @@ git clone https://github.com/raghavauppuluri13/BracketBotOS.git
 
 ```
 cd BracketBotOS
-uv sync
+python -m venv venv
+source venv/bin/activate
+pip install .
 ```
 
 ```
@@ -25,24 +27,24 @@ uv sync
 3. Calibrate
 
 ```
-manager calibrate --only drive
+calibrate drive
 ```
 
 4. Run
 
 In one terminal:
 ```
-manager run --only camera drive mobile_joystick
+manager --only camera drive mobile_joystick
 ```
 
 In another terminal:
 
 ```
-uv run apps/teleop.py
+source venv/bin/activate
+python apps/teleop.py
 ```
 
 ## Debug
 
-- To prevent spamming of debug logs, you can access the .log files for all daemons with `debug-daemons` (or `debug-daemons > log` for easy copy pasting into LLMs)
-
+- You can access the .log files for all daemons with `debug-daemons` (or `debug-daemons > log` for easy copy pasting into LLMs)
 - `debug-systemd hotspot` to debug the hotspot network logs
