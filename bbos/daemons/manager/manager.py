@@ -17,14 +17,22 @@ class ManagedProc:
         self.cwd = cwd
         self.proc = None
         self.last_start = 0.0
+        self.script_name = "daemon.py"
 
-    def _launch(self):
+    def _launch(self, script_name: str):
         os.chdir(self.cwd)
-        log_path = f"/tmp/{self.name}.log"
+        log_path = f"/tmp/{self.name}-{script_name.replace('.py','')}.log"
+
+        if script_name == "calibrate.py" and not (self.cwd /
+                                                  "calibrate.py").exists():
+            print(f"[manager] {self.name}: calibrate.py not found, skipping.")
+            return
+
         cmd = [
             "nix-shell", "--run",
-            f"echo '[shell] now running daemon: {self.name}'; python daemon.py {self.name}"
+            f"echo '[shell] now running {script_name[:-3]}: {self.name}'; python {script_name} {self.name}"
         ]
+
         with open(log_path, "wb", buffering=0) as log_fd:
             os.dup2(log_fd.fileno(), 1)
             os.dup2(log_fd.fileno(), 2)
@@ -79,18 +87,37 @@ def discover_daemons(root: Path):
 
 
 def main():
-    ap = argparse.ArgumentParser(
-        prog="manager", description="Start and supervise selected daemons")
-    ap.add_argument("--only",
-                    metavar="NAME",
-                    nargs="*",
-                    default=[],
-                    help="Daemons to start/manage (space-separated list)")
+    ap = argparse.ArgumentParser(prog="manager")
+    sub = ap.add_subparsers(dest="mode", required=True)
+
+    shared = dict(
+        metavar="NAME",
+        nargs="*",
+        default=[],
+        help="Daemons to manage (space-separated)",
+    )
+
+    run_p = sub.add_parser("run", help="Run daemon.py")
+    run_p.add_argument("--only", **shared)
+
+    cal_p = sub.add_parser("calibrate", help="Run calibrate.py if it exists")
+    cal_p.add_argument("--only", **shared)
+
     args = ap.parse_args()
+    mode = args.mode
+
     procs = list(discover_daemons(DAEMONS_ROOT))
     if args.only:
-        procs = [proc for proc in procs if proc.name in args.only]
-    print(f"Managing daemons: {', '.join(p.name for p in procs)}")
+        procs = [p for p in procs if p.name in args.only]
+
+    print(
+        f"[manager] Mode: {mode} | Managing: {', '.join(p.name for p in procs)}"
+    )
+
+    # Inject selected script into each proc
+    script_name = "calibrate.py" if mode == "calibrate" else "daemon.py"
+    for p in procs:
+        p.script_name = script_name
 
     running = True
 
@@ -113,7 +140,3 @@ def main():
     for p in procs:
         p.stop()
     print("[manager] done")
-
-
-if __name__ == "__main__":
-    main()

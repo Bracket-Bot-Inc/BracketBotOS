@@ -388,17 +388,15 @@ def test_motor_direction():
         time.sleep(0.5)
 
     # Save direction results to config.yaml
-    config_path = '/opt/robot/daemons/odrive/config.yaml'
+    config_path = 'config.yaml'
     try:
-        # Load current config
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+        config = {}
 
         # Update motor directions
-        config['odrive']['dir_left'] = directions['left']
-        config['odrive']['dir_right'] = directions['right']
+        config['dir_left'] = directions['left']
+        config['dir_right'] = directions['right']
 
-        # Write updated config back
+        # Write config
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, indent=2)
 

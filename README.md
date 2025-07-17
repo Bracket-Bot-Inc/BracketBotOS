@@ -6,10 +6,14 @@
 ## Quickstart
 1. Clone
 
+```
+git clone https://github.com/raghavauppuluri13/BracketBotOS.git
+```
 
 2. Install
 
 ```
+cd BracketBotOS
 uv sync
 ```
 
@@ -18,11 +22,17 @@ uv sync
 ./install
 ```
 
-3. Run
+3. Calibrate
+
+```
+manager calibrate --only drive
+```
+
+4. Run
 
 In one terminal:
 ```
-manager --only camera drive mobile_joystick
+manager run --only camera drive mobile_joystick
 ```
 
 In another terminal:

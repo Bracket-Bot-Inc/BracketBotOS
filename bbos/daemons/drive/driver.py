@@ -1,5 +1,3 @@
-#!/opt/robot/daemons/odrive/venv/bin/python3
-
 import serial
 import odrive.enums
 import os
@@ -20,8 +18,10 @@ class ODriveUART:
         self.SERIAL_PORT = cfg.serial_port
         self.left_axis = cfg.left_axis
         self.right_axis = cfg.right_axis
-        self.dir_left = cfg.dir_left
-        self.dir_right = cfg.dir_right
+        with open("config.yaml") as f:
+            yml = yaml.safe_load(f) or {}
+        self.dir_left = yml.get("dir_left", cfg.dir_left)
+        self.dir_right = yml.get("dir_right", cfg.dir_right)
         self.bus = serial.Serial(port=self.SERIAL_PORT,
                                  baudrate=cfg.baudrate,
                                  parity=serial.PARITY_NONE,
