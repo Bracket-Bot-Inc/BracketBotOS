@@ -67,14 +67,10 @@ class ManagedProc:
         self.proc.join(timeout=5)
         self.proc = None
 
-    def keep_alive(self):
+    def check_alive(self):
         if not self.proc or self.proc.exitcode is not None:
             if self.proc:
-                print(
-                    f"[manager] {self.name} exited ({self.proc.exitcode}), restarting"
-                )
-                pass
-            self.start()
+                print(f"[manager] {self.name} exited ({self.proc.exitcode})")
 
 
 def discover_daemons(root: Path):
@@ -111,8 +107,8 @@ def main():
 
     while running:
         for p in procs:
-            p.keep_alive()
-        time.sleep(0.5)
+            p.check_alive()
+        time.sleep(1.0)
 
     for p in procs:
         p.stop()

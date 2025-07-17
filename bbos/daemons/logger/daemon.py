@@ -13,14 +13,11 @@ if __name__ == "__main__":
     rr.serve_web(web_port=9090, server_memory_limit='500MB')
     rr.set_time("monotonic", timestamp=time.monotonic())
     t = Time(10)
-    with Reader("/camera.points") as r_points:
+    with Reader("/camera.depth") as r_depth:
         while True:
-            if r_points.ready():
-                stale, d = r_points.get()
-                rr.log(
-                    "points",
-                    rr.Points3D(positions=d['points'],
-                                colors=d['colors'],
-                                radii=0.02))
+            if r_depth.ready():
+                stale, d = r_depth.get()
+                if stale: continue
+                rr.log("depth_image", rr.Image(d['depth']))
             t.tick()
     print(t.stats)

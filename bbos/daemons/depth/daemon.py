@@ -7,12 +7,14 @@ import numpy as np
 import numpysane as nps
 
 CFG = Config("stereo")
+CFG_D = Config("depth")
 
-if __name__ == "__main__":
+
+def main():
     config_realtime_process(1, Priority.CTRL_HIGH)
     models = [ mrcal.cameramodel(f) \
-               for f in ('cache/camera-0_opencv.cameramodel',
-                         'cache/camera-1_opencv.cameramodel') ]
+               for f in ('cache/camera-0.cameramodel',
+                         'cache/camera-1.cameramodel') ]
     models_rectified = \
         mrcal.rectified_system(models,
                                az_fov_deg = CFG.xfov,
@@ -20,6 +22,7 @@ if __name__ == "__main__":
     rec_w, rec_h = models_rectified[0].imagersize()
     rectification_maps = mrcal.rectification_maps(models, models_rectified)
     with Reader('/camera.jpeg') as r_jpeg, \
+            Writer('/camera.depth', lambda: Type("camera_depth")(rec_h, rec_w)) as w_depth, \
             Writer('/camera.points', lambda: Type("camera_points")(rec_h, rec_w)) as w_points:
 
         t = Time(20)
@@ -31,7 +34,6 @@ if __name__ == "__main__":
                 if stale: continue
                 stereo = cv2.imdecode(d["jpeg"], cv2.IMREAD_COLOR)
 
-
                 if stereo is None: continue
                 images_rectified = [
                     mrcal.transform_image(
@@ -39,43 +41,39 @@ if __name__ == "__main__":
                         rectification_maps[i]) for i in range(2)
                 ]
                 # Find stereo correspondences using OpenCV
-                block_size = 5
-                max_disp = 160  # in pixels
                 matcher = \
                     cv2.StereoSGBM_create(
-                        minDisparity=0,
-                        numDisparities=16*3,  # Reduce search range for speed
-                        blockSize=3,          # Smaller block for less computation
-                        P1=8*3*3**2,
-                        P2=32*3*3**2,
+                        minDisparity=CFG_D.min_disp,
+                        numDisparities=CFG_D.num_disp,  # Reduce search range for speed
+                        blockSize=CFG_D.block_size,          # Smaller block for less computation
+                        P1=8 * 3 * CFG_D.block_size ** 2,
+                        P2=32 * 3 * CFG_D.block_size ** 2,
                         disp12MaxDiff=2,
-                        uniquenessRatio=5,
-                        speckleWindowSize=50,
-                        speckleRange=16,
-                        preFilterCap=31,
+                        uniquenessRatio=CFG_D.uniquenessRatio,
+                        speckleWindowSize=CFG_D.speckle_w_size,
+                        speckleRange=CFG_D.specle_range,
+                        preFilterCap=CFG_D.prefilter_cap,
                         mode=cv2.STEREO_SGBM_MODE_SGBM_3WAY  # Retain 3-way optimization for speed
                     )
-                disp16 = matcher.compute(
-                    *images_rectified)  # in pixels*16
-                disp16 = disp16.astype(np.float32) / 16.0
-                disp16[disp16 <= 0] = np.nan
-                valid = np.isfinite(disp16)
-                disp_norm = np.zeros_like(disp16, dtype=np.uint8)
-                disp_norm[valid] = np.clip(
-                    255 * (disp16[valid] - np.nanmin(disp16)) / (np.nanmax(disp16) - np.nanmin(disp16)),
-                    0, 255
-                ).astype(np.uint8)
+                disp = matcher.compute(*images_rectified).astype(
+                    np.float32) / 16.0  # in pixels*16
+                valid = disp > (CFG_D.min_disp + 0.5)
+                denom = disp - CFG_D.min_disp
+                depth_m = np.zeros_like(disp)
+                mask = (denom > 0.1) & valid
+                # Ensure type checker knows these are initialised
+                assert fx_ds is not None and baseline_m is not None, "Stereo parameters not initialised"
+                depth_m[mask] = fx_ds * baseline_m / denom[mask]
 
-                # Color map
-                color_disp = cv2.applyColorMap(disp_norm, cv2.COLORMAP_JET)
-                color_disp = cv2.cvtColor(color_disp, cv2.COLOR_BGR2RGB)
-                # Point cloud in rectified camera-0 coordinates
-                # shape (H,W,3)
+                # Encode depth to 16-bit PNG (millimetres – preserves precision)
+                depth_mm = np.clip(depth_m * 1000.0, 0,
+                                   65535).astype(np.uint16)
 
                 with w_depth.buf() as b:
+                    b['depth'] = depth_mm.reshape((rec_h, rec_w))
 
                 with w_points.buf() as b:
-                    b['points'][:] = mrcal.stereo_unproject(disparity16,
+                    b['points'][:] = mrcal.stereo_unproject(disp16,
                                                             models_rectified,
                                                             disparity_scale=16)
                     Rt_cam0_rect0 = mrcal.compose_Rt(
@@ -87,3 +85,7 @@ if __name__ == "__main__":
                     b['timestamp'] = d['timestamp']
             t.tick()
     print(t.stats)
+
+
+if __name__ == "__main__":
+    main()
