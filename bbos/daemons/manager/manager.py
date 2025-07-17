@@ -21,11 +21,32 @@ class ManagedProc:
     def _launch(self):
         os.chdir(self.cwd)
         log_file = f"/tmp/{self.name}.log"
+        print(f"[launcher] spawning nix-shell for {self.name}…")
+
         with open(log_file, "wb", buffering=0) as log_fd:
-            os.dup2(log_fd.fileno(), 1)  # stdout → log file
-            os.dup2(log_fd.fileno(), 2)  # stderr → log file
-            os.execvp("nix-shell",
-                      ["nix-shell", "--run", f"python daemon.py {self.name}"])
+            os.dup2(log_fd.fileno(), 1)  # stdout
+            os.dup2(log_fd.fileno(), 2)  # stderr
+
+            os.execvp("nix-shell", [
+                "nix-shell", "--run",
+                f"echo '[shell] now running daemon: {self.name}'; python daemon.py {self.name}"
+            ])
+
+    def _wait_for_ready(self, timeout=10.0):
+        log_path = Path(f"/tmp/{self.name}.log")
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if not log_path.exists():
+                time.sleep(0.1)
+                continue
+            with open(log_path, "rb") as f:
+                lines = f.readlines()[-10:]
+                if any(b"now running daemon" in l for l in lines):
+                    self.ready = True
+                    print(f"[manager] {self.name} is ready")
+                    return
+            time.sleep(0.2)
+        print(f"[manager] {self.name} did not signal readiness")
 
     def start(self):
         if self.proc or time.monotonic() - self.last_start < 1.0:
@@ -34,6 +55,7 @@ class ManagedProc:
         self.proc.start()
         self.last_start = time.monotonic()
         print(f"[manager] started {self.name} (pid={self.proc.pid})")
+        self._wait_for_ready()
 
     def stop(self, sig=signal.SIGINT):
         if not self.proc:

@@ -44,7 +44,7 @@ def main():
     daemons = find_daemon_names()
 
     for daemon in daemons:
-        if daemon in ["manager"]:
+        if daemon in ["manager", "hotspot"]:
             remove_service(daemon)
 
     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)

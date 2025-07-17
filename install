@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 import shutil
 
-DAEMONS_DIR = Path(__file__).resolve().parent / "daemons"
+DAEMONS_DIR = Path(__file__).resolve().parent / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
 
 SERVICE_TEMPLATE = """
@@ -37,9 +37,7 @@ def check_and_install_nix():
         check=True)
     bashrc = Path.home() / ".bashrc"
     append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
-    print(
-        "[!] Nix installation complete."
-    )
+    print("[!] Nix installation complete.")
     os.execvp("bash",
               ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
 

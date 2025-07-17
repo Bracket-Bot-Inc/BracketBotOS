@@ -10,11 +10,11 @@ SPEED_ANG = 2.0  # rad s⁻¹ CCW+
 # ----------------------------------------------------------------------
 if __name__ == "__main__":
     with Writer("/drive.ctrl", Type("drive_ctrl")) as w_ctrl, \
-         Reader("/mobile.imu") as r_device_imu:
+         Reader("/mobile.imu") as r_mobile_imu:
         t = Time(50)
         while True:
-            if r_device_imu.ready():
-                stale, imu = r_device_imu.get()
+            if r_mobile_imu.ready():
+                stale, imu = r_mobile_imu.get()
                 gyro = imu['gyro']
                 cmd = gyro[1] * -SPEED_LIN, gyro[0] * SPEED_ANG
                 with w_ctrl.buf() as b:
