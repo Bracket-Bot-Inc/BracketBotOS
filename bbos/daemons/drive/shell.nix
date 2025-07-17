@@ -24,7 +24,7 @@ pkgs.mkShell {
       echo "Virtual environment activated. Use 'deactivate' to exit."
 
       pip install -e ../../..
-      pip install PyYAML>=6.0 odrive==0.5.1.post0 pyserial>=3.5
+      pip install PyYAML odrive==0.5.1.post0 pyserial
 
       # Add user to dialout group for UART communication
       echo "Adding user to dialout group for UART permissions..."

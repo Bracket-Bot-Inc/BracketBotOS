@@ -87,8 +87,8 @@ def run(w_joy, r_cam, rate, response_time=1, wait_time=5, port=8000):
       touch-action: none;
     }
     #feed {
-      max-height: 240px;
-      max-width: 320px;
+      max-height: 480px;
+      max-width: 640px;
       border: 2px solid #333;
       border-radius: 12px;
     }

@@ -40,7 +40,7 @@ def check_and_install_nix():
 
 
 def generate_openssl_cert(days=30):
-    cert_dir = Path.home() / ".cert"
+    cert_dir = Path.home() / ".auth"
     cert_dir.mkdir(exist_ok=True)
 
     key_path = cert_dir / "key.pem"
