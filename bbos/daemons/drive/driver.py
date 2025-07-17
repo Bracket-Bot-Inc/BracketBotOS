@@ -18,8 +18,11 @@ class ODriveUART:
         self.SERIAL_PORT = cfg.serial_port
         self.left_axis = cfg.left_axis
         self.right_axis = cfg.right_axis
-        with open("config.yaml") as f:
-            yml = yaml.safe_load(f) or {}
+        try:
+            with open("config.yaml") as f:
+                yml = yaml.safe_load(f) or {}
+        except FileNotFoundError:
+            yml = {}
         self.dir_left = yml.get("dir_left", cfg.dir_left)
         self.dir_right = yml.get("dir_right", cfg.dir_right)
         self.bus = serial.Serial(port=self.SERIAL_PORT,

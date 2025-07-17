@@ -19,7 +19,7 @@ if __name__ == "__main__":
             if r_joy.ready():
                 stale, joy = r_joy.get()
                 state = joy['state']
-                cmd = state[1] * SPEED_LIN, -state[0] * SPEED_ANG
+                cmd = state[0] * SPEED_LIN, state[1] * SPEED_ANG
                 with w_ctrl.buf() as b:
                     b["twist"][:] = cmd
             t.tick()

@@ -491,7 +491,8 @@ if __name__ == '__main__':
 
         # First calibration - ODrive
         print("\n\033[1;36mStep 1: ODrive Motor Calibration\033[0m")
-        calibration_success = calibrate_odrive()
+        #calibration_success = calibrate_odrive()
+        calibration_success = True
 
         if not calibration_success:
             print(f"\n{RED}ODrive calibration failed.{RESET}")

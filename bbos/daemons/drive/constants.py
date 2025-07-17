@@ -17,7 +17,7 @@ class drive:
 class odrive:
     serial_port: str = "/dev/ttyAMA1"
     baudrate: int = 115200
-    timeout: int = 1  # seconds
+    timeout: int = 15  # seconds
     left_axis: int = 0
     right_axis: int = 1
     axis_state_closed_loop: int = 8

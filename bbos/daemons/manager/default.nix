@@ -18,6 +18,23 @@ EOF
     '';
   };
 
+  calibrate = pkgs.stdenv.mkDerivation {
+    name = "calibrate";
+    version = "1.0";
+    src = ./.;
+    buildInputs = [ pkgs.python311 ];
+    installPhase = ''
+      mkdir -p $out/bin
+      ln -s "$src/calibrate.py" "$out/bin/calibrate.py"
+
+      cat > $out/bin/calibrate <<EOF
+#!/bin/sh
+exec python3 "\$(dirname "\$0")/calibrate.py" "\$@"
+EOF
+      chmod +x $out/bin/calibrate
+    '';
+  };
+
 debug_daemons = pkgs.writeShellApplication {
   name = "debug-daemons";
   text = ''
@@ -71,5 +88,5 @@ debug_systemd = pkgs.writeShellApplication {
 
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager debug_systemd debug_daemons ];
+  paths = [ manager calibrate debug_systemd debug_daemons ];
 }
