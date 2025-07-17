@@ -253,8 +253,8 @@ pkgs.mkShell {
     python311.pkgs.virtualenv
     python311.pkgs.pip
     python311.pkgs.evdev
-    #python311.pkgs.opencv4
-    opencvPythonSimd
+    python311.pkgs.opencv4
+    #opencvPythonSimd
     zlib
     libGL
     glibc
@@ -290,7 +290,7 @@ pkgs.mkShell {
       python -m venv venv
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
-      pip install -e ../../
+      pip install -e ../../..
       # daemon
       pip install turbojpeg-rpi v4l2-python3 
       # mrcal

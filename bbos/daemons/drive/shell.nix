@@ -23,7 +23,7 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
 
-      pip install -e ../..
+      pip install -e ../../..
       pip install PyYAML>=6.0 odrive==0.5.1.post0 pyserial>=3.5
 
       # Add user to dialout group for UART communication

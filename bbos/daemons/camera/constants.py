@@ -5,7 +5,7 @@ import numpy as np
 
 @register
 class stereo:
-    rate: int = 120  # Frames per second (camera supports 120fps at 2560x720 MJPG)
+    rate: int = 40  # Frames per second (camera supports 120fps at 2560x720 MJPG)
     dev: int = 0  # device id /dev/video<dev>
     width: int = 2560  # stereo image width
     height: int = 720  # stereo image height

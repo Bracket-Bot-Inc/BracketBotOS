@@ -23,7 +23,7 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
 
-      pip install -e ../..
+      pip install -e ../../..
       pip install fastapi uvicorn websockets wsproto
     else
       source venv/bin/activate

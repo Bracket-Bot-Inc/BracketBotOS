@@ -12,7 +12,7 @@ from turbojpeg import decompress_to, PF
 
 
 def main():
-    config_realtime_process(2, Priority.CTRL_HIGH)
+    config_realtime_process(3, Priority.CTRL_HIGH)
     CFG = Config("stereo")
     fd = os.open(f'/dev/video{CFG.dev}', os.O_RDWR)
 

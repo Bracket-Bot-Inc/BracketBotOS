@@ -33,25 +33,19 @@ def remove_paths_from_shell_profiles():
     for profile in [home / ".bashrc", home / ".zshrc"]:
         if profile.exists():
             lines = profile.read_text().splitlines()
-            new_lines = [
-                line for line in lines if "Robot Daemons PATH" not in line
-            ]
+            new_lines = [line for line in lines if "BracketBotOS" not in line]
             profile.write_text("\n".join(new_lines) + "\n")
             print(f"Cleaned up {profile}")
 
 
 def main():
     daemons = find_daemon_names()
-
     for daemon in daemons:
-        if daemon in ["manager", "hotspot"]:
-            remove_service(daemon)
+        remove_service(daemon)
 
     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
-
     remove_paths_from_shell_profiles()
-
-    print("Uninstall complete.")
+    print("Uninstall complete. Restart shell")
 
 
 if __name__ == "__main__":

@@ -274,7 +274,7 @@ pkgs.mkShell {
       python -m venv venv
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
-      pip install -e ../../
+      pip install -e ../../..
       # daemon
       pip install turbojpeg-rpi v4l2-python3 
       # mrcal

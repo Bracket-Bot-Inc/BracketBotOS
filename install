@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import os
-import subprocess
+import os, argparse, subprocess, shutil
 from pathlib import Path
-import shutil
 
 DAEMONS_DIR = Path(__file__).resolve().parent / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
+
+SERVICES = ["hotspot"]
 
 SERVICE_TEMPLATE = """
 [Unit]
@@ -23,9 +23,6 @@ RemainAfterExit=yes
 WantedBy=multi-user.target
 """
 
-# these daemons get systemd services
-INSTALL_DAEMONS = {"hotspot"}
-
 
 def check_and_install_nix():
     if shutil.which("nix"):
@@ -42,34 +39,52 @@ def check_and_install_nix():
               ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
 
 
-def generate_openssl_cert():
+def generate_openssl_cert(days=30):
     cert_dir = Path.home() / ".cert"
     cert_dir.mkdir(exist_ok=True)
 
     key_path = cert_dir / "key.pem"
     cert_path = cert_dir / "cert.pem"
 
+    if key_path.exists() and cert_path.exists():
+        print("OpenSSL Cert exists! Skipping...")
+        return
     subprocess.run([
-        "openssl", "req", "-x509", "-nodes", "-newkey", "rsa:2048", "-keyout",
-        str(key_path), "-out",
-        str(cert_path), "-days",
-        str(days), "-subj", f"/CN={domain}", "-addext",
-        f"subjectAltName=DNS:{domain},IP:{ip}"
+        "openssl",
+        "req",
+        "-x509",
+        "-nodes",
+        "-newkey",
+        "rsa:2048",
+        "-keyout",
+        str(key_path),
+        "-out",
+        str(cert_path),
+        "-days",
+        str(days),
+        "-subj",
+        f"/CN=bracketbot.home",
     ],
                    check=True)
 
 
-def find_buildable_daemons(root: Path):
-    for p in root.glob("*/default.nix"):
-        daemon = p.parent.name
-        yield daemon, p.parent
-
-
 def build_daemon(path: Path):
-    print(f"Building {path.name}...")
-    subprocess.run(
-        ["nix-build", str(path), "-o",
-         str(path / "result")], check=True)
+    print(f"\033[1;32mBuilding {path.name}...\033[0m")  # bold green
+
+    shell_nix = path / "shell.nix"
+    default_nix = path / "default.nix"
+
+    if shell_nix.exists():
+        subprocess.run(["nix-shell", "--run", "true"], cwd=path, check=True)
+    elif default_nix.exists():
+        subprocess.run(
+            ["nix-build",
+             str(default_nix), "-o",
+             str(path / "result")],
+            check=True)
+
+    else:
+        raise FileNotFoundError(f"No shell.nix or default.nix found in {path}")
 
 
 def append_if_not_exists(line, file):
@@ -118,21 +133,38 @@ def install_service(daemon: str, path: Path):
 
 
 def main():
+    ap = argparse.ArgumentParser(prog="install",
+                                 description="Installs bracketbot ")
+    ap.add_argument("--only",
+                    metavar="NAME",
+                    nargs="*",
+                    default=None,
+                    help="Daemons to install (space-separated list)")
+    args = ap.parse_args()
     check_and_install_nix()
-    #generate_openssl_cert()
+    generate_openssl_cert()
 
-    built_paths = []
-    for daemon, path in find_buildable_daemons(DAEMONS_DIR):
-        build_daemon(path)
-        built_paths.append(path)
-        if daemon in INSTALL_DAEMONS:
-            install_service(daemon, path)
-        else:
-            print(f"Skipping install for {daemon}")
+    add_to_PATH = []
+    for p in [d for d in DAEMONS_DIR.iterdir() if d.is_dir()]:
+        daemon = p.name
+        build_daemon(p)
+        if (p / "default.nix").exists():
+            add_to_PATH.append(p)
+        if daemon in SERVICES:
+            install_service(daemon, p)
 
-    if built_paths:
-        add_paths_to_shell_profiles(built_paths)
+    if add_to_PATH:
+        add_paths_to_shell_profiles(add_to_PATH)
+        shell = os.environ.get("SHELL", "/bin/bash")
+        os.execlp(shell, shell, "-l")  # resets shell
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--only",
+                        nargs="+",
+                        default=None,
+                        help="List of daemons to build/install")
+    args = parser.parse_args()
+
     main()
