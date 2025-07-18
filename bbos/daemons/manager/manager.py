@@ -87,7 +87,7 @@ def main():
                     default=[],
                     help="Daemons to start/manage (space-separated list)")
     args = ap.parse_args()
-    procs = list(discover_daemons(DAEMONS_ROOT))
+    procs = list(discover_daemons(DAEMONS_DIR))
     if args.only:
         procs = [proc for proc in procs if proc.name in args.only]
     print(f"Managing daemons: {', '.join(p.name for p in procs)}")
