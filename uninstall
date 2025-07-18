@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import subprocess
 from pathlib import Path
+import shutil
 
 SYSTEMD_DIR = "/etc/systemd/system"
 BIN_DIR = "/usr/local/bin"
 
 # Automatically find all daemons by scanning daemons/*/default.nix
-DAEMONS_DIR = Path(__file__).resolve().parent / "daemons"
+DAEMONS_DIR = Path(__file__).parent.absolute() / "bbos" / "daemons"
 
 
 def find_daemon_names():
@@ -28,12 +29,19 @@ def remove_service(daemon):
         print(f"[=] Service file {service_file} does not exist, skipping.")
 
 
+def remove_auth():
+    auth = Path.home() / '.auth'
+    if auth.exists():
+        print(f"Removing {str(auth)}")
+        shutil.rmtree(str(auth))
+
+
 def remove_paths_from_shell_profiles():
     home = Path.home()
     for profile in [home / ".bashrc", home / ".zshrc"]:
         if profile.exists():
             lines = profile.read_text().splitlines()
-            new_lines = [line for line in lines if "BracketBotOS" not in line]
+            new_lines = [line for line in lines if "bbos" not in line]
             profile.write_text("\n".join(new_lines) + "\n")
             print(f"Cleaned up {profile}")
 
@@ -42,9 +50,9 @@ def main():
     daemons = find_daemon_names()
     for daemon in daemons:
         remove_service(daemon)
-
     subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
     remove_paths_from_shell_profiles()
+    remove_auth()
     print("Uninstall complete. Restart shell")
 
 

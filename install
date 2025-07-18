@@ -2,7 +2,7 @@
 import os, argparse, subprocess, shutil
 from pathlib import Path
 
-DAEMONS_DIR = Path(__file__).resolve().parent / "bbos" / "daemons"
+DAEMONS_DIR = Path(__file__).parent.absolute() / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
 
 SERVICES = ["hotspot"]

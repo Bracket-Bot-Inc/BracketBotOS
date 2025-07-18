@@ -3,8 +3,8 @@ import signal, sys, numpy as np
 from bbos import Writer, Reader, Type, Time
 from bbos.os_utils import gateway
 
-SPEED_LIN = 0.5  # m s⁻¹  forward/back
-SPEED_ANG = 3.0  # rad s⁻¹ CCW+
+SPEED_LIN = 1.5  # m s⁻¹  forward/back
+SPEED_ANG = 4.0  # rad s⁻¹ CCW+
 
 # ----------------------------------------------------------------------
 # main
