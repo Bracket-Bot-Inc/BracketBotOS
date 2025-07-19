@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64", "setuptools-scm", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,6 @@ description = "BracketBot OS"
 authors = [{ name = "Raghava Uppuluri" }]
 urls = { Homepage = "https://github.com/BracketBotInc/BracketBotOS" }
 dependencies = [
-  "sshkeyboard",
   "posix_ipc",
   "numpy",
   "pillow",
@@ -18,3 +17,6 @@ requires-python = ">=3.7"
 
 [tool.setuptools]
 packages = ["bbos"]
+
+[tool.setuptools.package-data]
+"bbos" = ["daemons/*/constants.py"]

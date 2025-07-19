@@ -101,8 +101,7 @@ def append_if_not_exists(line, file):
 
 
 def add_paths_to_shell_profiles(paths):
-    export_line = "export PATH=" + ":".join(f"{p}/result/bin"
-                                            for p in paths) + ":$PATH"
+    export_line = "export PATH=" + ":".join(str(p) for p in paths) + ":$PATH"
     home = Path.home()
     profiles = [
         home / ".bashrc",
@@ -147,13 +146,17 @@ def main():
     add_to_PATH = []
     for p in [d for d in DAEMONS_DIR.iterdir() if d.is_dir()]:
         daemon = p.name
-        build_daemon(p)
-        if (p / "default.nix").exists():
-            add_to_PATH.append(p)
+        if (p / "default.nix").exists() or (p / "shell.nix").exists():
+            build_daemon(p)
+            if (p / "default.nix").exists():
+                add_to_PATH.append(p / "result" / "bin")
+        else:
+            print(f"Skipping {p} because it doesn't have a default.nix or shell.nix")
         if daemon in SERVICES:
             install_service(daemon, p)
 
     if add_to_PATH:
+        add_to_PATH.append(str(Path(__file__).parent.absolute() / 'bin'))
         add_paths_to_shell_profiles(add_to_PATH)
         shell = os.environ.get("SHELL", "/bin/bash")
         os.execlp(shell, shell, "-l")  # resets shell

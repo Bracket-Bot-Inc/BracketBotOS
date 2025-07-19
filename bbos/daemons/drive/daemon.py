@@ -35,8 +35,8 @@ if __name__ == "__main__":
                 with w_state.buf() as s:
                     p_l, v_l = od.get_pos_vel_left()
                     p_r, v_r = od.get_pos_vel_right()
-                    s['pos'][:] = [p_l, p_r]
-                    s['vel'][:] = [v_l, v_r]
+                    s['pos'] = [p_l, p_r]
+                    s['vel'] = [v_l, v_r]
 
             # -------------------------------------------------------------- status
             if tst.tick(block=False):

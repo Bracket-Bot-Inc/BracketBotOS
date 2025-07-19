@@ -68,7 +68,7 @@ class Writer:
         self._seq.value += 1  # mark as dirty (odd)
         self._buf[0]['timestamp'] = time.monotonic()
         try:
-            yield self._buf
+            yield self._buf[0]
         finally:
             self._seq.value += 1  # mark as published (even)
 

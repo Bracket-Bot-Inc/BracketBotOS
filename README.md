@@ -14,9 +14,6 @@ git clone https://github.com/raghavauppuluri13/BracketBotOS.git
 
 ```
 cd BracketBotOS
-python -m venv venv
-source venv/bin/activate
-pip install .
 ```
 
 ```
@@ -40,8 +37,7 @@ manager --only camera drive mobile_joystick
 In another terminal:
 
 ```
-source venv/bin/activate
-python apps/teleop.py
+bb teleop
 ```
 
 ## Debug

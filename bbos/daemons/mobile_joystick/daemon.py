@@ -195,8 +195,8 @@ def run(w_joy, r_cam, rate, response_time=1, wait_time=5, port=8000):
                 if "x" not in payload or "y" not in payload:
                     continue
                 with w_joy.buf() as buf:
-                    buf[:]['state'] = np.array([payload["x"], payload["y"]])
-                    buf[:]['timestamp'] = rate.now()
+                    buf['state'] = np.array([payload["x"], payload["y"]])
+                    buf['timestamp'] = rate.now()
                 await asyncio.sleep(0.01)
         except WebSocketDisconnect:
             print("[WS] Client disconnected")

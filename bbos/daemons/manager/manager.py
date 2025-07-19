@@ -7,7 +7,7 @@ import signal
 from multiprocessing import Process
 from pathlib import Path
 
-DAEMONS_DIR = Path(__file__).parent.parent.absolute()
+DAEMONS_DIR = Path(__file__).parent.parent.parent.parent.absolute()
 
 
 class ManagedProc:
@@ -88,6 +88,7 @@ def main():
                     help="Daemons to start/manage (space-separated list)")
     args = ap.parse_args()
     procs = list(discover_daemons(DAEMONS_DIR))
+    print(DAEMONS_DIR)
     if args.only:
         procs = [proc for proc in procs if proc.name in args.only]
     print(f"Managing daemons: {', '.join(p.name for p in procs)}")

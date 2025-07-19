@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_NAME="$1"
+SCRIPT_PATH="apps/${SCRIPT_NAME}.py"
+BBOS_WHEEL="$(realpath dist/bbos-*-py3-none-any.whl)"
+BBOS_DEP="bbos @ $BBOS_WHEEL"
+
+[[ -f "$SCRIPT_PATH" ]] || { echo "Script not found: $SCRIPT_PATH"; exit 1; }
+[[ -f "$BBOS_WHEEL" ]] || { echo "No bbos wheel found in ./dist/"; exit 1; }
+
+# Extract existing dependencies from script (if any)
+EXISTING_DEPS=()
+in_block=0
+while IFS= read -r line; do
+  [[ "$line" =~ ^#\ +///\ +script ]] && in_block=1 && continue
+  [[ "$in_block" == 1 && "$line" =~ ^#\ +/// ]] && break
+  if [[ "$in_block" == 1 && "$line" =~ ^#\ +\"(.+)\" ]]; then
+    dep="${BASH_REMATCH[1]}"
+    if [[ "$dep" != "$BBOS_DEP" ]]; then
+      EXISTING_DEPS+=("\"$dep\"")
+    fi
+  fi
+done < "$SCRIPT_PATH"
+
+# Assemble full dependency list
+DEPS=("\"$BBOS_DEP\"" "${EXISTING_DEPS[@]}")
+{
+  echo "# /// script"
+  echo "# dependencies = ["
+  for dep in "${DEPS[@]}"; do echo "#   $dep,"; done
+  echo "# ]"
+  echo "# ///"
+  echo
+  cat "$SCRIPT_PATH"
+} | uv run -

@@ -73,15 +73,15 @@ def main():
                     b['depth'] = depth_mm.reshape((rec_h, rec_w))
 
                 with w_points.buf() as b:
-                    b['points'][:] = mrcal.stereo_unproject(disp16,
+                    b['points'] = mrcal.stereo_unproject(disp16,
                                                             models_rectified,
                                                             disparity_scale=16)
                     Rt_cam0_rect0 = mrcal.compose_Rt(
                         models[0].extrinsics_Rt_fromref(),
                         models_rectified[0].extrinsics_Rt_toref())
-                    b['points'][:] = mrcal.transform_point_Rt(
+                    b['points'] = mrcal.transform_point_Rt(
                         Rt_cam0_rect0, b['points'][:])
-                    b['colors'][:] = images_rectified[0]
+                    b['colors'] = images_rectified[0]
                     b['timestamp'] = d['timestamp']
             t.tick()
     print(t.stats)

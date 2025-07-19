@@ -68,10 +68,10 @@ def main():
             fcntl.ioctl(fd, v4l2.VIDIOC_DQBUF, buf)
             stamp = r.now()  # stamp as early as possible
             with w.buf() as b:
-                b['bytesused'][0] = buf.bytesused
-                b['jpeg'][0, :buf.bytesused] = memoryview(
+                b['bytesused'] = buf.bytesused
+                b['jpeg'][:buf.bytesused] = memoryview(
                     mmap_buf[:buf.bytesused])
-                b[:]['timestamp'] = stamp
+                b['timestamp'] = stamp
             r.tick()
     # Cleanup
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMOFF, buf_type)
