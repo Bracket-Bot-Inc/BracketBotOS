@@ -5,6 +5,7 @@ from driver import ODriveUART
 import numpy as np
 import signal, sys, traceback
 
+
 # ----------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------
@@ -48,8 +49,10 @@ if __name__ == "__main__":
                 _, d = r_ctrl.get()
                 vd, wd = map(float, d['twist'])  # desired linear, angular
                 vd_l, vd_r = vd - wd * R, vd + wd * R
-                od.set_speed_mps_left(vd_l)
-                od.set_speed_mps_right(vd_r)
+            else:
+                vd_l, vd_r = 0, 0
+            od.set_speed_mps_left(vd_l)
+            od.set_speed_mps_right(vd_r)
     od.stop_left()
     od.stop_right()
     print("state", ts.stats)

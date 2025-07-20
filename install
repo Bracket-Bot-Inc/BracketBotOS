@@ -5,7 +5,7 @@ from pathlib import Path
 DAEMONS_DIR = Path(__file__).parent.absolute() / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
 
-SERVICES = ["hotspot"]
+SERVICES = ["hotspot", "manager"]
 
 SERVICE_TEMPLATE = """
 [Unit]
@@ -123,9 +123,9 @@ def install_service(daemon: str, path: Path):
                    input=service_content.encode(),
                    check=True)
 
-    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
     subprocess.run(["sudo", "systemctl", "enable", f"{daemon}.service"],
-                   check=True)
+                   check=False)
     subprocess.run(["sudo", "systemctl", "start", f"{daemon}.service"],
                    check=False)
     print(f"{daemon} service installed and started.")

@@ -88,5 +88,5 @@ debug_systemd = pkgs.writeShellApplication {
 
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate debug_systemd debug_daemons ];
+  paths = [ manager calibrate debug_systemd debug_daemons];
 }

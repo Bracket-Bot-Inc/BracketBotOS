@@ -34,7 +34,7 @@ class odrive:
 
 @register
 def drive_ctrl():
-    return [("twist", (np.float32, 2))]
+    return [("twist", (np.float32, 2))]  # linear, angular
 
 
 @register

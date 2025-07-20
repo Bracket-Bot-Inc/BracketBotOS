@@ -1,15 +1,15 @@
 from bbos import Reader, Time
-from bbos.os_utils import who_ip
+from bbos.os_utils import user_ip
 
 import time
 import rerun as rr
 import os
 
-RERUN_HOST = who_ip()
-
-if __name__ == "__main__":
+def main():
+    RERUN_HOST = user_ip()
     rr.init("vis", spawn=False)
-    viewer_url = f"http://192.168.10.1:9090/?url=rerun%2Bhttp://192.168.10.1:9876/proxy"
+    viewer_url = f"http://{user_ip()}:9090/?url=rerun%2Bhttp://{user_ip()}:9876/proxy"
+    print(f"[logger] Viewer URL: {viewer_url}")
     rr.serve_web(web_port=9090, server_memory_limit='500MB')
     rr.set_time("monotonic", timestamp=time.monotonic())
     t = Time(10)
@@ -21,3 +21,6 @@ if __name__ == "__main__":
                 rr.log("depth_image", rr.Image(d['depth']))
             t.tick()
     print(t.stats)
+
+if __name__ == "__main__":
+    pass

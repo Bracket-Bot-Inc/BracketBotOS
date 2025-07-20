@@ -69,7 +69,7 @@ class ManagedProc:
 
     def check_alive(self):
         if not self.proc or self.proc.exitcode is not None:
-            if self.proc:
+            if self.proc and self.proc.exitcode != 0:
                 print(f"[manager] {self.name} exited ({self.proc.exitcode})")
 
 
