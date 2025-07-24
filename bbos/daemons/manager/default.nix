@@ -52,16 +52,37 @@ debug_daemons = pkgs.writeShellApplication {
       '
     }
 
-    for f in /tmp/*.log; do
-      echo -e "$PINK========== LOG FILE: $f ==========$RESET"
-      highlight_errors < "$f"
-      echo ""
-    done
+    if [ "$#" -eq 0 ]; then
+      # No argument provided - show all log files
+      for f in /tmp/*.log; do
+        echo -e "$PINK========== LOG FILE: $f ==========$RESET"
+        highlight_errors < "$f"
+        echo ""
+      done
+    else
+      # Argument provided - show logs containing daemon name
+      DAEMON_NAME="$1"
+      FOUND_LOGS=false
+      
+      for f in /tmp/*"$DAEMON_NAME"*.log; do
+        if [ -f "$f" ]; then
+          echo -e "$PINK========== LOG FILE: $f ==========$RESET"
+          highlight_errors < "$f"
+          echo ""
+          FOUND_LOGS=true
+        fi
+      done
+      
+      if [ "$FOUND_LOGS" = false ]; then
+        echo -e "$RED" "[ERROR] No log files found containing: $DAEMON_NAME" "$RESET"
+        exit 1
+      fi
+    fi
   '';
 };
 
-debug_systemd = pkgs.writeShellApplication {
-  name = "debug-systemd";
+debug_service = pkgs.writeShellApplication {
+  name = "debug-service";
   text = ''
     PINK="\033[1;35m"
     RED="\033[31m"
@@ -101,5 +122,5 @@ clean = pkgs.writeShellApplication {
 
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate debug_systemd debug_daemons clean];
+  paths = [ manager calibrate debug_service debug_daemons clean];
 }

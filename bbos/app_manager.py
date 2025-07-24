@@ -32,9 +32,18 @@ class AppManager:
         """Get list of available apps from APPS_PATH"""
         apps = []
         for app_dir in self.app_dirs:
+            # Check for .py files
             for app_file in app_dir.glob("*.py"):
                 apps.append(app_file.stem)
                 self.app_paths[app_file.stem] = app_file.absolute()
+            
+            # Check for folders with main.py
+            for folder in app_dir.iterdir():
+                if folder.is_dir():
+                    main_file = folder / "main.py"
+                    if main_file.exists():
+                        apps.append(folder.name)
+                        self.app_paths[folder.name] = main_file.absolute()
         return apps
     
     def is_app_running(self, app: str) -> bool:

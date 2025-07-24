@@ -20,10 +20,10 @@ os.environ['ULTRALYTICS_QUIET'] = 'True'
 os.environ['DISABLE_ULTRALYTICS_VERSIONING_CHECK'] = 'True'
 
 
-TURN_SPEED = 0.7
+TURN_SPEED = 2
 CENTER_THRESHOLD = 0.05
-FORWARD_SPEED = 7.0 # Speed for moving forward/backward
-TARGET_WIDTH_RATIO = 0.4  # Target width of person relative to image width
+FORWARD_SPEED = 21.0 # Speed for moving forward/backward
+TARGET_WIDTH_RATIO = 0.2  # Target width of person relative to image width
 WIDTH_THRESHOLD = 0.02  # Acceptable range around target width
 MODEL_PATH =  "yolov8n.pt"
 NCNN_MODEL_PATH = "yolov8n_ncnn_model"

@@ -12,6 +12,10 @@ git clone https://github.com/raghavauppuluri13/BracketBotOS.git
 ```
 cd BracketBotOS
 ```
+```
+# build the bbos wheel
+./build.sh
+```
 
 ```
 # takes around 5-10min
@@ -25,12 +29,15 @@ calibrate drive
 ```
 
 4. Run
+Open https://<HOSTNAME>.local:8001 to see the dashboard and toggle apps
+
+OR: 
 
 ```
 uv run apps/teleop.py
 ```
 
 ## Debug
-
-- You can access the .log files for all daemons with `debug-daemons` (or `debug-daemons > log` for easy copy pasting into LLMs)
-- `debug-systemd hotspot` to debug the hotspot network logs
+- Run `clean` to reset bracketbot to a fresh state
+- `debug-daemons [daemon_name]` to view logs for all daemons or a specific daemon
+- `debug-service <service>` to debug the installed system services
