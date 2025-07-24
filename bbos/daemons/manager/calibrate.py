@@ -3,6 +3,9 @@ import os
 import sys
 import subprocess
 from pathlib import Path
+import pwd
+
+CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
 
 if len(sys.argv) != 2:
     print("Usage: calibrate <daemon-name>")
@@ -17,6 +20,6 @@ if not calibrate_py.exists():
     sys.exit(1)
 
 os.chdir(daemon_dir)
-
+os.environ["PATH"] = f"/home/{CURRENT_USER}/.nix-profile/bin"
 cmd = ["nix-shell", "--run", f"python calibrate.py {daemon_name}"]
 sys.exit(subprocess.run(cmd, check=True))

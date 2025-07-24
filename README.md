@@ -1,8 +1,5 @@
 # BracketBotOS
 
-## Prerequisites
-- [Install uv](https://docs.astral.sh/uv/getting-started/installation/): 
-
 ## Quickstart
 1. Clone
 
@@ -29,15 +26,8 @@ calibrate drive
 
 4. Run
 
-In one terminal:
 ```
-manager --only camera drive mobile_joystick
-```
-
-In another terminal:
-
-```
-bb teleop
+uv run apps/teleop.py
 ```
 
 ## Debug

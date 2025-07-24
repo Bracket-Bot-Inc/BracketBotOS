@@ -45,10 +45,23 @@ def check_and_install_nix():
         ["bash", "-c", "curl -L https://nixos.org/nix/install | bash"],
         check=True)
     bashrc = Path.home() / ".bashrc"
-    append_ifq_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
+    append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
     print("[!] Nix installation complete.")
     os.execvp("bash",
               ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
+
+
+def check_and_install_uv():
+    if shutil.which("uv"):
+        print("[+] uv is already installed.")
+        return
+    print("[*] Installing uv...")
+    subprocess.run(
+        ["bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
+        check=True)
+    bashrc = Path.home() / ".bashrc"
+    append_if_not_exists("source ~/.cargo/env", bashrc)
+    print("[!] uv installation complete.")
 
 
 def generate_openssl_cert(days=30):
@@ -144,28 +157,19 @@ def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
 
 
 def main():
-    ap = argparse.ArgumentParser(prog="install",
-                                 description="Installs bracketbot ")
-    ap.add_argument("--only",
-                    metavar="NAME",
-                    nargs="*",
-                    default=None,
-                    help="Daemons to install (space-separated list)")
-    args = ap.parse_args()
     check_and_install_nix()
+    check_and_install_uv()
     generate_openssl_cert()
 
     add_to_PATH = []
     # build
     for p in [d for d in DAEMONS_DIR.iterdir() if d.is_dir()]:
-        daemon = p.name
         if (p / "default.nix").exists() or (p / "shell.nix").exists():
             build_daemon(p)
             if (p / "default.nix").exists():
                 add_to_PATH.append(p / "result" / "bin")
         else:
             print(f"Skipping {p} because it doesn't have a default.nix or shell.nix")
-    
     # install
     for service in SERVICES:
         p = DAEMONS_DIR / service
