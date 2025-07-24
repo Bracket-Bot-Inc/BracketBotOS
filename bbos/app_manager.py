@@ -17,7 +17,7 @@ def get_owned_locks(name):
                 yield lock
     return []
 
-def get_lock_path(app): return Path(f"/tmp/{app}_lock")
+def get_lock_path(app): return Path(f"/tmp/app-{app}_lock")
 
 class AppManager:
     def __init__(self, app_dirs: List[Path] | Path):
@@ -39,7 +39,7 @@ class AppManager:
     
     def is_app_running(self, app: str) -> bool:
         lock = get_lock_path(app)
-        return app in self.processes and self.processes[app].is_alive() and lock.exists()
+        return (app in self.processes and self.processes[app].is_alive()) or lock.exists()
 
    # ── dashboard/launch side ─────────────────────────────────────────────
     def _launch_app(self, app):
@@ -143,7 +143,7 @@ class AppManager:
                 self.stop_app(app)
             app_status[app] = {
                 "running": self.is_app_running(app),
-                "pid": self.processes[app].pid if self.is_app_running(app) else None
+                "pid": self.processes[app].pid if app in self.processes and self.processes[app].is_alive() else None
             }
         
         return {
