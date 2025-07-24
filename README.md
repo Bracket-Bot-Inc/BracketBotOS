@@ -34,7 +34,7 @@ Open https://<HOSTNAME>.local:8001 to see the dashboard and toggle apps
 OR: 
 
 ```
-uv run apps/teleop.py
+uv run apps/<apps>.py
 ```
 
 ## Debug

@@ -48,7 +48,7 @@ class AppManager:
     
     def is_app_running(self, app: str) -> bool:
         lock = get_lock_path(app)
-        return (app in self.processes and self.processes[app].is_alive()) or lock.exists()
+        return (app in self.processes and self.processes[app].is_alive()) or (app not in self.processes and lock.exists())
 
    # ── dashboard/launch side ─────────────────────────────────────────────
     def _launch_app(self, app):
@@ -62,17 +62,16 @@ class AppManager:
 
     # ── dashboard/stop side ───────────────────────────────────────────────
     def stop_app(self, app, timeout=PROCESS_STOP_TIMEOUT):
-        if not self.is_app_running(app):
-            return False
-        if app in self.processes:
-            p = self.processes[app]
-            os.killpg(p.pid, signal.SIGINT)                 # ② INT the whole group
-            p.join(timeout)
-            if p.is_alive():
-                for lock in get_owned_locks(app):
-                    os.remove(lock)
-                p.terminate(); p.join(2)                    # escalate → TERM/KILL
-            del self.processes[app]
+        if self.is_app_running(app):
+            if app in self.processes:
+                p = self.processes[app]
+                os.killpg(p.pid, signal.SIGINT)                 # ② INT the whole group
+                p.join(timeout)
+                if p.is_alive():
+                    for lock in get_owned_locks(app):
+                        os.remove(lock)
+                    p.terminate(); p.join(2)                    # escalate → TERM/KILL
+                del self.processes[app]
         get_lock_path(app).unlink(missing_ok=True) # will trigger stop if running in another app manager
         return True
 
