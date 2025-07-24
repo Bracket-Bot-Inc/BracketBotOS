@@ -1,12 +1,37 @@
 import importlib.util, sys
 from pathlib import Path
 
-from .registry import Config, register, Type
-from .shm import Writer, Reader
-from .time import Time
+# prevent "from bbos import *"
+__all__ = []
 
+def __dir__():
+    return []  # no public names
 
-def _ignite_daemon_constants():
+# PEP 562
+_symbols = {
+    "Config": "bbos.registry",
+    "register": "bbos.registry",
+    "Type": "bbos.registry",
+    "Writer": "bbos.shm",
+    "Reader": "bbos.shm",
+    "Time": "bbos.time",
+    "AppManager": "bbos.app_manager",
+}
+
+_collected = False
+def __getattr__(name):
+    global _collected
+    if name in _symbols:
+        if name in ("Config", "Type") and not _collected:
+            _collect_daemon_constants()
+            _collected = True
+        mod = importlib.import_module(_symbols[name])
+        val = getattr(mod, name)
+        globals()[name] = val  # cache for next time
+        return val
+    raise AttributeError(f"module 'bbos' has no attribute '{name}'")
+
+def _collect_daemon_constants():
     """Import every daemons/<name>/constants.py once."""
     base = Path(__file__).parent / "daemons"
     if not base.is_dir():
@@ -23,6 +48,3 @@ def _ignite_daemon_constants():
             sys.modules[
                 mod_name] = module  # register before exec to avoid recursion
             spec.loader.exec_module(module)  # ⟵ runs @register decorators
-
-
-_ignite_daemon_constants()

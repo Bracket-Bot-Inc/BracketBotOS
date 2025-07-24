@@ -1,5 +1,9 @@
-#!/usr/bin/env python3
-
+# NOAUTO
+# /// script
+# dependencies = [
+#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+# ]
+# ///
 import numpy as np
 from bbos import Writer, Reader, Type, Config, Time
 import time

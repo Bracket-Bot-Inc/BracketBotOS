@@ -11,7 +11,7 @@ DAEMONS_DIR = Path(__file__).parent.absolute() / "bbos" / "daemons"
 
 
 def find_daemon_names():
-    return [p.parent.name for p in DAEMONS_DIR.glob("*/default.nix")]
+    return [p.parent.name for p in DAEMONS_DIR.glob("*/default.nix")] + ["autostart"]
 
 
 def remove_service(daemon):

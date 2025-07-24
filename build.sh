@@ -10,39 +10,27 @@ echo "[*] Cleaning staging and dist..."
 rm -rf "$STAGING" "$WHEELDIR"
 mkdir -p "$STAGING/$NAME/daemons"
 mkdir -p "$WHEELDIR"
+echo "[*] Copying Python files..."
 
-echo "[*] Copying only constants.py files (excluding venv)..."
-find bbos/daemons -type f -name constants.py -not -path "*/venv/*" | while read -r src; do
+# Copy all .py files from bbos root (excluding daemons)
+find bbos -maxdepth 1 -type f -name "*.py" | while read -r src; do
   relpath="${src#bbos/}"
   dst="$STAGING/$NAME/$relpath"
   mkdir -p "$(dirname "$dst")"
   cp "$src" "$dst"
 done
 
-echo "[*] Writing setup.py and pyproject.toml..."
-cat > "$STAGING/setup.py" <<EOF
-from setuptools import setup
+# Copy only constants.py and __init__.py files from daemons (excluding venv)
+find bbos/daemons -type f \( -name constants.py \) -not -path "*/venv/*" | while read -r src; do
+  relpath="${src#bbos/}"
+  dst="$STAGING/$NAME/$relpath"
+  mkdir -p "$(dirname "$dst")"
+  cp "$src" "$dst"
+done
 
-setup(
-    name="${NAME}",
-    version="${VERSION}",
-    packages=[],
-    include_package_data=True,
-    package_data={"": ["daemons/*/constants.py"]},
-    install_requires=[
-        "sshkeyboard",
-        "posix_ipc",
-        "numpy",
-        "pillow",
-    ],
-)
-EOF
+echo "[*] Writing project.toml..."
 
-cat > "$STAGING/pyproject.toml" <<EOF
-[build-system]
-requires = ["setuptools>=64", "wheel"]
-build-backend = "setuptools.build_meta"
-EOF
+cp pyproject.toml "$STAGING/"
 
 echo "[*] Building clean wheel..."
 (
@@ -52,14 +40,6 @@ echo "[*] Building clean wheel..."
 
 echo "[*] Moving wheel to ./dist/"
 mv "$STAGING/dist/"*.whl "$WHEELDIR/"
-
-echo "[*] Verifying no extra files slipped in..."
-bad=$(unzip -l "$WHEELDIR"/*.whl | grep -vE 'constants\.py|\.dist-info' || true)
-if [[ -n "$bad" ]]; then
-  echo "❌ Unexpected files in wheel:"
-  echo "$bad"
-  exit 1
-fi
 
 echo "[+] Build complete. Final contents:"
 unzip -l "$WHEELDIR"/*.whl | grep constants.py

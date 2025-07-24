@@ -55,7 +55,7 @@ def main():
     # Stream on
     buf_type = ctypes.c_int(v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE)
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMON, buf_type)
-
+    mv = memoryview(mmap_buf)
     r = Time(CFG.rate)
     with Writer('/camera.jpeg', lambda: Type("camera_jpeg")(buf.length)) as w:
         while True:
@@ -66,11 +66,10 @@ def main():
             select.select([fd], [], [])
             # Dequeue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_DQBUF, buf)
-            stamp = r.now()  # stamp as early as possible
+            stamp = Time.now()  # stamp as early as possible
             with w.buf() as b:
                 b['bytesused'] = buf.bytesused
-                b['jpeg'][:buf.bytesused] = memoryview(
-                    mmap_buf[:buf.bytesused])
+                b['jpeg'][:buf.bytesused] = mv[:buf.bytesused]
                 b['timestamp'] = stamp
             r.tick()
     # Cleanup

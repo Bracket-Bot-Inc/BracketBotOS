@@ -1,6 +1,8 @@
+# NOAUTO
 # /// script
 # dependencies = [
 #   "ultralytics",
+#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "turbojpeg-rpi",
 #   "ncnn",
 # ]
@@ -22,7 +24,7 @@ TURN_SPEED = 0.7
 CENTER_THRESHOLD = 0.05
 FORWARD_SPEED = 7.0 # Speed for moving forward/backward
 TARGET_WIDTH_RATIO = 0.4  # Target width of person relative to image width
-WIDTH_THRESHOLD = 0.05  # Acceptable range around target width
+WIDTH_THRESHOLD = 0.02  # Acceptable range around target width
 MODEL_PATH =  "yolov8n.pt"
 NCNN_MODEL_PATH = "yolov8n_ncnn_model"
 
@@ -39,16 +41,18 @@ def main():
     with Reader("/camera.jpeg") as r_jpeg, \
         Writer("/drive.ctrl", Type("drive_ctrl")) as w_ctrl:
         while True:
+            results = []
             if r_jpeg.ready():
                 stale, d = r_jpeg.get()
                 if stale: continue
                 img = np.array(decompress(d['jpeg'], PF.RGB))[:,:img_width,:]
                 results = model(img, classes=[0],verbose=False)
+
             # Find the largest person detection
             best_person = None
             max_area = 0
 
-            if len(results[0].boxes) == 0:
+            if len(results) == 0 or len(results[0].boxes) == 0:
                 continue
 
             for result in results[0].boxes:
@@ -77,12 +81,9 @@ def main():
             if abs(x_error) < CENTER_THRESHOLD:
                 cmd[:] = [0, forward_speed]
             elif x_error > 0:
-                print("right")
                 cmd[:] = [TURN_SPEED*abs(x_error), forward_speed]
             else:
-                print("left")
                 cmd[:] = [-TURN_SPEED*abs(x_error), forward_speed]
-            print(cmd)
             with w_ctrl.buf() as b:
                 b['twist'] = cmd
             t.tick()

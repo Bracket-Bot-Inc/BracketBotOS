@@ -1,6 +1,7 @@
+# NOAUTO
 # /// script
 # dependencies = [
-#   "numpy",
+#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "aiohttp",
 #   "aiortc",
 #   "av",

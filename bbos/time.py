@@ -1,6 +1,4 @@
-import numpy as np
-import time
-
+import time, numpy as np
 
 class Time:
 
@@ -25,7 +23,8 @@ class Time:
             self._stats['max'] = max(self.hz, self._stats['max'])
         return True
 
-    def now(self):
+    @staticmethod
+    def now():
         return time.monotonic()
 
     @property

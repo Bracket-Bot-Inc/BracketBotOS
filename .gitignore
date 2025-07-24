@@ -1,3 +1,8 @@
+*.pt
+*ncnn_model
+*.torchscript
+*.bin
+*.param
 *.DS_Store
 .build*
 *.wav

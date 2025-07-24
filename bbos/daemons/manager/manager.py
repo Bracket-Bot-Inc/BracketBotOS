@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
-import os
-import sys
-import argparse
-import time
-import signal
+import os, pwd, sys, time, signal
 from multiprocessing import Process
 from pathlib import Path
 
-DAEMONS_DIR = Path(__file__).parent.parent.parent.parent.absolute()
-
+CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
 
 class ManagedProc:
 
@@ -21,6 +16,7 @@ class ManagedProc:
     def _launch(self):
         os.chdir(self.cwd)
         log_path = f"/tmp/{self.name}.log"
+        os.environ["PATH"] = f"/home/{CURRENT_USER}/.nix-profile/bin"
         cmd = [
             "nix-shell", "--run",
             f"echo '[shell] now running daemon: {self.name}'; python daemon.py {self.name}"
@@ -30,7 +26,7 @@ class ManagedProc:
             os.dup2(log_fd.fileno(), 2)
             os.execvp(cmd[0], cmd)
 
-    def _wait_for_ready(self, timeout=500.0):
+    def _wait_for_ready(self, timeout=10.0):
         log_path = Path(f"/tmp/{self.name}.log")
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
@@ -79,16 +75,12 @@ def discover_daemons(root: Path):
 
 
 def main():
-    ap = argparse.ArgumentParser(
-        prog="manager", description="Start and supervise selected daemons")
-    ap.add_argument("--only",
-                    metavar="NAME",
-                    nargs="*",
-                    default=[],
-                    help="Daemons to start/manage (space-separated list)")
-    args = ap.parse_args()
-    procs = list(discover_daemons(DAEMONS_DIR))
-    print(DAEMONS_DIR)
+    if len(sys.argv) < 2:
+        print("Usage: manager <daemons_dir> [only]")
+        sys.exit(1)
+    args = type('Args', (), {'daemons_dir': sys.argv[1], 'only': sys.argv[2:]})()
+    procs = list(discover_daemons(Path(args.daemons_dir)))
+    print(args.daemons_dir)
     if args.only:
         procs = [proc for proc in procs if proc.name in args.only]
     print(f"Managing daemons: {', '.join(p.name for p in procs)}")

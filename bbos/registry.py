@@ -1,8 +1,8 @@
 # registry.py
-import numpy as np
 from functools import wraps
 from inspect import isclass
 from threading import Lock
+import numpy as np
 
 _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
@@ -29,7 +29,6 @@ def register(robj):
 
 # --- helpers ---------------------------------------------------------------
 class Type:
-
     def __init__(self, name: str):
         self._name = name
 
@@ -49,6 +48,7 @@ class Config:
 
 
 def all_types():
+    import numpy as np
     return {k: v() + [("timestamp", np.float64)] for k, v in _types.items()}
 
 

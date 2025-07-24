@@ -1,5 +1,9 @@
-#!/usr/bin/env python3
-
+# NOAUTO
+# /// script
+# dependencies = [
+#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+# ]
+# ///
 import numpy as np
 from bbos import Writer, Reader, Type, Config, Time
 import time
@@ -116,7 +120,6 @@ if __name__ == "__main__":
             # Update LEDs
             if current_led_count > 0:
                 set_leds_smooth(w_led, current_color, current_led_count)
-                print(f"[AudioLED] {active_source}: {active_volume:.3f} -> {current_led_count:.1f}/{CFG_LED.num_leds} LEDs")
             else:
                 set_leds_smooth(w_led, OFF, 0)
                 current_color = OFF

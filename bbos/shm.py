@@ -1,7 +1,8 @@
 from bbos import Type
 from bbos.os_utils import CACHE_LINE
 
-import os, json, inspect, time, contextlib, traceback, ctypes, posix_ipc, mmap, numpy as np
+import os, json, inspect, time, contextlib, sys, traceback, ctypes, posix_ipc, mmap, numpy as np
+from pathlib import Path
 
 
 def _caller_sig():
@@ -10,7 +11,9 @@ def _caller_sig():
 
 
 def _write_lock(fd, sig, dtype):
-    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr}).encode())
+    owner = Path(sys.modules['__main__'].__file__)
+    owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
+    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "owner": owner}).encode())
 
 
 def json_descr_to_dtype(desc):

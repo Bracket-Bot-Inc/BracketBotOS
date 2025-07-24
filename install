@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
-import os, argparse, subprocess, shutil
+import os, argparse, subprocess, shutil, pwd
 from pathlib import Path
-
-DAEMONS_DIR = Path(__file__).parent.absolute() / "bbos" / "daemons"
+BRACKETBOT_DIR = Path(__file__).parent.absolute()
+BIN_DIR = BRACKETBOT_DIR / "bin"
+DAEMONS_DIR = BRACKETBOT_DIR / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
-
-SERVICES = ["hotspot", "manager"]
+CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
+APP_DIRS = " ".join([str(p) for p in [BRACKETBOT_DIR / "apps"]])
+SERVICES = {
+    "hotspot": {"type": "oneshot", "as_user": False, "env": ""},
+    "manager": {"type": "simple", "as_user": True, 
+                "exec_start": f"{DAEMONS_DIR}/manager/result/bin/manager {DAEMONS_DIR}", 
+                "env": f""},
+    "autostart": {"type": "simple", 
+            "exec_start": f"/bin/bash -c -l '{BIN_DIR}/autostart {APP_DIRS}'",
+            "as_user": True,
+            "env": "PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
+}
 
 SERVICE_TEMPLATE = """
 [Unit]
@@ -15,10 +26,11 @@ After=network.target NetworkManager.service
 BindsTo=sys-subsystem-net-devices-wlan0.device
 
 [Service]
-Type=oneshot
-ExecStart={setup_script}
+{user_block}
+Type={type}
+ExecStart={exec_start}
 RemainAfterExit=yes
-
+Environment={env}
 [Install]
 WantedBy=multi-user.target
 """
@@ -33,7 +45,7 @@ def check_and_install_nix():
         ["bash", "-c", "curl -L https://nixos.org/nix/install | bash"],
         check=True)
     bashrc = Path.home() / ".bashrc"
-    append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
+    append_ifq_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
     print("[!] Nix installation complete.")
     os.execvp("bash",
               ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
@@ -110,25 +122,25 @@ def add_paths_to_shell_profiles(paths):
         append_if_not_exists(export_line, profile)
 
 
-def install_service(daemon: str, path: Path):
-    setup_script = f"{path.resolve()}/result/bin/{daemon}"
-    service_file = f"{SYSTEMD_DIR}/{daemon}.service"
+def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
+    service_file = Path(SYSTEMD_DIR) / f"{daemon}.service"
 
-    print(f"Installing systemd service for {daemon} at {service_file}")
-    subprocess.run(["sudo", "chmod", "+x", setup_script], check=True)
+    # build the unit text
+    user_block = (f"User={CURRENT_USER}\nGroup={CURRENT_USER}") if cfg['as_user'] else ""
+    unit_text  = SERVICE_TEMPLATE.format(daemon=daemon,
+                                  exec_start=cfg.get('exec_start', exec_start),
+                                  type=cfg['type'],
+                                  user_block=user_block,
+                                  env=cfg['env'])
 
-    service_content = SERVICE_TEMPLATE.format(daemon=daemon,
-                                              setup_script=setup_script)
-    subprocess.run(["sudo", "tee", service_file],
-                   input=service_content.encode(),
-                   check=True)
+    # write + enable + start
+    subprocess.run(["sudo", "tee", str(service_file)],
+                   input=unit_text.encode(), check=True)
+    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
+    subprocess.run(["sudo", "systemctl", "enable", service_file.name], check=True)
+    subprocess.run(["sudo", "systemctl", "start",  service_file.name],  check=False)
 
-    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=False)
-    subprocess.run(["sudo", "systemctl", "enable", f"{daemon}.service"],
-                   check=False)
-    subprocess.run(["sudo", "systemctl", "start", f"{daemon}.service"],
-                   check=False)
-    print(f"{daemon} service installed and started.")
+    print(f"[✓] {daemon}.service installed; will run as {CURRENT_USER if cfg['as_user'] else 'root'}.")
 
 
 def main():
@@ -144,6 +156,7 @@ def main():
     generate_openssl_cert()
 
     add_to_PATH = []
+    # build
     for p in [d for d in DAEMONS_DIR.iterdir() if d.is_dir()]:
         daemon = p.name
         if (p / "default.nix").exists() or (p / "shell.nix").exists():
@@ -152,8 +165,12 @@ def main():
                 add_to_PATH.append(p / "result" / "bin")
         else:
             print(f"Skipping {p} because it doesn't have a default.nix or shell.nix")
-        if daemon in SERVICES:
-            install_service(daemon, p)
+    
+    # install
+    for service in SERVICES:
+        p = DAEMONS_DIR / service
+        exec_path = f"{p.resolve()}/result/bin/{service}"
+        install_service(service, exec_path, SERVICES[service])
 
     if add_to_PATH:
         add_to_PATH.append(str(Path(__file__).parent.absolute() / 'bin'))

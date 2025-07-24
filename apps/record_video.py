@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 # /// script
 # dependencies = [
-#   "numpy",
+#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 
@@ -29,6 +28,7 @@ def main():
     """Record video frames from camera daemon with configurable cadence."""
     
     # Ensure output directory exists
+    print(os.listdir())
     OUTPUT_DIR.mkdir(exist_ok=True)
     
     # Get cadence and convert to Hz

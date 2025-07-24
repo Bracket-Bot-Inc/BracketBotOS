@@ -11,12 +11,12 @@ urls = { Homepage = "https://github.com/BracketBotInc/BracketBotOS" }
 dependencies = [
   "posix_ipc",
   "numpy",
-  "pillow",
 ]
 requires-python = ">=3.7"
 
 [tool.setuptools]
 packages = ["bbos"]
+include-package-data = true
 
 [tool.setuptools.package-data]
-"bbos" = ["daemons/*/constants.py"]
+"bbos" = ["**/*.py"]

@@ -1,20 +1,22 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
+  makeWrapper = pkgs.makeWrapper;
+  python = pkgs.python311;
+  runtimePath = pkgs.lib.makeBinPath [ python pkgs.busybox ];
+
   manager = pkgs.stdenv.mkDerivation {
     name = "manager";
     version = "1.0";
     src = ./.;
-    buildInputs = [ pkgs.python311 ];
+    nativeBuildInputs = [ makeWrapper ];
     installPhase = ''
       mkdir -p $out/bin
       ln -s "$src/manager.py" "$out/bin/manager.py"
 
-      cat > $out/bin/manager <<EOF
-#!/bin/sh
-exec python3 "\$(dirname "\$0")/manager.py" "\$@"
-EOF
-      chmod +x $out/bin/manager
+      makeWrapper ${python}/bin/python3 $out/bin/manager \
+        --add-flags "$out/bin/manager.py" \
+        --set PATH ${runtimePath}
     '';
   };
 
@@ -22,16 +24,14 @@ EOF
     name = "calibrate";
     version = "1.0";
     src = ./.;
-    buildInputs = [ pkgs.python311 ];
+    nativeBuildInputs = [ makeWrapper ];
     installPhase = ''
       mkdir -p $out/bin
       ln -s "$src/calibrate.py" "$out/bin/calibrate.py"
 
-      cat > $out/bin/calibrate <<EOF
-#!/bin/sh
-exec python3 "\$(dirname "\$0")/calibrate.py" "\$@"
-EOF
-      chmod +x $out/bin/calibrate
+      makeWrapper ${python}/bin/python3 $out/bin/calibrate \
+        --add-flags "$out/bin/calibrate.py" \
+        --set PATH ${runtimePath}
     '';
   };
 
