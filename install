@@ -181,6 +181,9 @@ def main():
         add_paths_to_shell_profiles(add_to_PATH)
         shell = os.environ.get("SHELL", "/bin/bash")
         os.execlp(shell, shell, "-l")  # resets shell
+    
+    # build bbos wheel
+    subprocess.run(["uv", "run", "--with", "build", "--", "./build.sh"], check=True)
 
 
 if __name__ == "__main__":

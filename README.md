@@ -12,10 +12,6 @@ git clone https://github.com/raghavauppuluri13/BracketBotOS.git
 ```
 cd BracketBotOS
 ```
-```
-# build the bbos wheel
-./build.sh
-```
 
 ```
 # takes around 5-10min
