@@ -96,6 +96,7 @@ class Reader:
         self._name = name
         self._lockfile = f"/tmp{name}_lock"
         self._lock_fd = None
+        self._readable = False
         self._valid = False
 
     def __enter__(self):
@@ -103,40 +104,46 @@ class Reader:
 
     def ready(self):
         if not os.path.exists(self._lockfile):
-            self._valid = False
-            return self._valid
+            self._readable = False
+            return self._readable
         # wait until the writer has created the lock-file
-        if self._valid:
-            return self._valid
-        try:
-            with open(self._lockfile, 'r') as f:
-                shmdtype = np.dtype(json_descr_to_dtype(json.load(f)["dtype"]))
-        except:
-            self._valid = False
-            return self._valid
-        self._valid = True
-        size = shmdtype.itemsize + CACHE_LINE
-        self._shm = posix_ipc.SharedMemory(self._name)
-        self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
-                                  mmap.PROT_READ)
-        self._seq = memoryview(self._mapfile)[:4].cast('I')
-        self._buf = np.ndarray(1,
-                               dtype=shmdtype,
-                               buffer=memoryview(self._mapfile)[CACHE_LINE:])
-        self._data = np.zeros_like(self._buf)[0]
-        self._shm.close_fd()
-        return self._valid
+        if not self._readable:
+            try:
+                with open(self._lockfile, 'r') as f:
+                    shmdtype = np.dtype(json_descr_to_dtype(json.load(f)["dtype"]))
+            except:
+                self._readable = False
+                return self._readable
+            self._readable = True
+            size = shmdtype.itemsize + CACHE_LINE
+            self._shm = posix_ipc.SharedMemory(self._name)
+            self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
+                                    mmap.PROT_READ)
+            self._seq = memoryview(self._mapfile)[:4].cast('I')
+            self._buf = np.ndarray(1,
+                                dtype=shmdtype,
+                                buffer=memoryview(self._mapfile)[CACHE_LINE:])
+            self._data = np.zeros_like(self._buf)[0]
+            self._shm.close_fd()
 
-    def get(self):
-        assert self._valid
-        while self._seq[0] & 1:  # writer busy
-            time.sleep(0)  # spin
-        s1 = self._seq[0]
-        data = self._buf[0].copy()
-        stale = data['timestamp'] == self._data['timestamp']
-        if s1 == self._seq[0]:  # unchanged → valid
-            self._data = data
-        return stale, self._data
+        if not self._seq[0] & 1:
+            s0 = self._seq[0]
+            self._valid = self._buf[0]['timestamp'] != self._data['timestamp']
+            for n in self._data.dtype.names:
+                self._data[n] = self._buf[0][n]
+            if s0 != self._seq[0]:
+                self._valid = False
+        else:
+            self._valid = False
+        return self._readable and self._valid
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def readable(self):
+        return self._readable and self._valid
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
