@@ -157,8 +157,8 @@ def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
 
 
 def main():
-    check_and_install_nix()
     check_and_install_uv()
+    check_and_install_nix()
     generate_openssl_cert()
 
     add_to_PATH = []
@@ -176,8 +176,6 @@ def main():
         exec_path = f"{p.resolve()}/result/bin/{service}"
         install_service(service, exec_path, SERVICES[service])
 
-    # build bbos wheel
-    subprocess.run(["uv", "run", "--with", "build", "--", "./build.sh"], check=True)
     # set cap_sys_nice for all python processes
     subprocess.run("sudo setcap 'cap_sys_nice=eip' $(readlink -f $(uv python find))", shell=True, check=True)
 
@@ -185,9 +183,8 @@ def main():
         add_to_PATH.append(str(Path(__file__).parent.absolute() / 'bin'))
         add_paths_to_shell_profiles(add_to_PATH)
         shell = os.environ.get("SHELL", "/bin/bash")
-        os.execlp(shell, shell, "-l")  # resets shell
     
-
+    print("Done! Please reboot!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
