@@ -1,4 +1,5 @@
-from bbos.registry import register
+from bbos import register, realtime
+from bbos.os_utils import Priority
 
 import numpy as np
 
@@ -32,18 +33,18 @@ class odrive:
 # ----------------------------------------------------------------------
 
 
-@register
+@realtime(50, Priority.CTRL_HIGH, [2])
 def drive_ctrl():
     return [("twist", (np.float32, 2))]  # linear, angular
 
 
-@register
+@realtime(50, Priority.CTRL_HIGH, [2])
 def drive_state():
     return [("pos", (np.float32, 2)), ("vel", (np.float32, 2)),
             ("torque", (np.float32, 2))]
 
 
-@register
+@realtime(1, Priority.CTRL_LOW, [1])
 def drive_status():
     return [
         ("voltage", np.float32),

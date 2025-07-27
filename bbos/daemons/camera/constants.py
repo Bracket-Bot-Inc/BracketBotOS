@@ -1,11 +1,12 @@
-from bbos.registry import register
+from bbos import register, realtime
+from bbos.os_utils import Priority
 
 import numpy as np
 
 
 @register
 class stereo:
-    rate: int = 40  # Frames per second (camera supports 120fps at 2560x720 MJPG)
+    rate: int = 20  # Frames per second (camera supports 120fps at 2560x720 MJPG)
     dev: int = 0  # device id /dev/video<dev>
     width: int = 2560  # stereo image width
     height: int = 720  # stereo image height
@@ -16,7 +17,7 @@ class stereo:
     f_x = (width / 2) / (2 * np.tan(np.deg2rad(xfov) / 2))
 
 
-@register
+@realtime(20, Priority.CTRL_HIGH, [0])
 def camera_jpeg(buflen):
     return [
         ("bytesused", np.uint32),

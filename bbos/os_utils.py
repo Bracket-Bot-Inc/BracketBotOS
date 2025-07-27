@@ -18,32 +18,10 @@ except Exception:
     IS_BB = False
 
 
-# Portions Copyright (c) 2018, Comma.ai, Inc.
-# Licensed under the MIT License.
 class Priority:
-    # CORE 2
-    # - modeld = 55
-    # - camerad = 54
-    CTRL_LOW = 51  # plannerd & radard
-
-    # CORE 3
-    # - pandad = 55
-    CTRL_HIGH = 53
-
-
-def set_core_affinity(cores: list[int]) -> None:
-    if _system == 'Linux' and IS_BB:
-        os.sched_setaffinity(0, cores)
-
-
-def config_realtime_process(cores: int | list[int], priority: int) -> None:
-    gc.disable()
-    if _system == 'Linux' and IS_BB:
-        os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(priority))
-    c = cores if isinstance(cores, list) else [
-        cores,
-    ]
-    set_core_affinity(c)
+    CTRL_LOW = 53
+    CTRL_MED = 54
+    CTRL_HIGH= 55
 
 
 def user_ip() -> str:

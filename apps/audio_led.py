@@ -5,8 +5,9 @@
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Reader, Type, Config, Time
-import time
+from bbos import Writer, Reader, Type, Config, Loop 
+from bbos.time import Realtime
+from bbos.os_utils import Priority
 
 CFG_LED = Config("led_strip")
 CFG_AUDIO = Config("speakerphone")
@@ -51,8 +52,7 @@ def set_leds_smooth(writer, color, led_count):
             # Apply brightness to the partial LED
             rgb_array[full_leds] = tuple(int(c * partial_brightness) for c in color)
     
-    with writer.buf() as b:
-        b["rgb"] = rgb_array
+    writer["rgb"] = rgb_array
 
 if __name__ == "__main__":
     print("[AudioLED] Starting audio-controlled LED volume bar...")
@@ -62,9 +62,6 @@ if __name__ == "__main__":
     with Reader("/audio.mic") as r_mic, \
          Reader("/audio.speaker") as r_speaker, \
          Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led:
-        
-        t = Time(CFG_LED.rate_state)  # Match LED update rate
-        
         # Animation state - use float for smooth ramping
         current_led_count = 0.0
         current_color = OFF
@@ -77,15 +74,11 @@ if __name__ == "__main__":
             
             # Check speaker audio level (takes priority)
             if r_speaker.ready():
-                stale, speaker_data = r_speaker.get()
-                if not stale:
-                    speaker_volume = get_audio_level(speaker_data["audio"])
+                speaker_volume = get_audio_level(r_speaker.data["audio"])
             
             # Check mic audio level
             if r_mic.ready():
-                stale, mic_data = r_mic.get()
-                if not stale:
-                    mic_volume = get_audio_level(mic_data["audio"])
+                mic_volume = get_audio_level(r_mic.data["audio"])
             
             # Determine desired LED count based on active audio source
             if speaker_volume > SPEAKER_THRESHOLD:
@@ -124,4 +117,4 @@ if __name__ == "__main__":
                 set_leds_smooth(w_led, OFF, 0)
                 current_color = OFF
             
-            t.tick()
+            Loop.sleep()

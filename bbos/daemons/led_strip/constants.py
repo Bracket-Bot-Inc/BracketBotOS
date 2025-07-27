@@ -1,4 +1,5 @@
-from bbos.registry import register
+from bbos.registry import *
+from bbos.os_utils import Priority
 
 import numpy as np
 
@@ -17,7 +18,7 @@ class led_strip:
 # Types
 # ----------------------------------------------------------------------
 
-@register
+@realtime(20, Priority.CTRL_MED, [0])
 def led_strip_ctrl():
     """Control message to set LED colors and brightness"""
     return [

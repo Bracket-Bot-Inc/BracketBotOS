@@ -5,13 +5,11 @@
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Reader, Type, Config, Time
-import time
+from bbos import Writer, Type, Config, Loop
 import threading
 import random
 import math
 import os
-from pathlib import Path
 
 CFG_LED = Config("led_strip")
 CFG_AUDIO = Config("speakerphone")
@@ -50,13 +48,13 @@ def load_audio_file(file_path):
         import subprocess
         
         # Use ffmpeg to convert audio to the format we need
-        sample_rate = CFG_AUDIO.sample_rate
-        channels = CFG_AUDIO.channels
+        sample_rate = CFG_AUDIO.speaker_sample_rate
+        channels = CFG_AUDIO.speaker_channels
         
         cmd = [
             'ffmpeg', '-i', file_path,
-            '-f', 'f32le',  # 32-bit float little endian
-            '-acodec', 'pcm_f32le',
+            '-f', 's16le',  # 32-bit float little endian
+            '-acodec', 'pcm_s16le',
             '-ar', str(sample_rate),
             '-ac', str(channels),
             '-'  # Output to stdout
@@ -66,7 +64,7 @@ def load_audio_file(file_path):
         result = subprocess.run(cmd, capture_output=True, check=True)
         
         # Convert bytes to numpy array
-        audio_data = np.frombuffer(result.stdout, dtype=np.float32)
+        audio_data = np.frombuffer(result.stdout, dtype=np.int16)
         
         if channels == 2:
             audio_data = audio_data.reshape(-1, 2)
@@ -75,7 +73,7 @@ def load_audio_file(file_path):
         
         # Apply volume multiplier and clip to prevent distortion
         audio_data = audio_data * VOLUME_MULTIPLIER
-        audio_data = np.clip(audio_data, -1.0, 1.0)
+        audio_data = np.clip(audio_data, -32768, 32767)
         
         print(f"[Fireplace] Loaded {len(audio_data) / sample_rate:.1f} seconds of audio")
         return audio_data
@@ -83,100 +81,6 @@ def load_audio_file(file_path):
     except (subprocess.CalledProcessError, FileNotFoundError, ImportError) as e:
         print(f"[Fireplace] Could not load audio file: {e}")
         return None
-
-def generate_crackling_sound(duration_seconds=1.0):
-    """Generate realistic crackling fire sound"""
-    sample_rate = CFG_AUDIO.sample_rate
-    channels = CFG_AUDIO.channels
-    num_samples = int(duration_seconds * sample_rate)
-    
-    # Start with a gentle base hiss (much quieter than before)
-    base_hiss = np.random.normal(0, 0.02, num_samples)
-    
-    # Apply low-pass filter to base hiss to remove harsh frequencies
-    # Simple exponential moving average filter
-    alpha = 0.1
-    filtered_hiss = np.zeros_like(base_hiss)
-    filtered_hiss[0] = base_hiss[0]
-    for i in range(1, len(base_hiss)):
-        filtered_hiss[i] = alpha * base_hiss[i] + (1 - alpha) * filtered_hiss[i-1]
-    
-    audio = filtered_hiss
-    
-    # Add realistic crackle pops (sharp attacks with decay)
-    num_crackles = random.randint(4, 12)
-    for _ in range(num_crackles):
-        crackle_start = random.randint(0, max(1, num_samples - 2000))
-        crackle_duration = random.randint(50, 300)
-        
-        # Create sharp attack crackle sound
-        t = np.arange(crackle_duration) / sample_rate
-        
-        # Sharp attack, quick decay
-        envelope = np.exp(-t * random.uniform(15, 40))
-        
-        # Mix of frequencies for realistic crackle
-        freq1 = random.uniform(800, 2500)
-        freq2 = random.uniform(1200, 4000)
-        crackle = (np.sin(2 * np.pi * freq1 * t) * 0.6 + 
-                  np.sin(2 * np.pi * freq2 * t) * 0.4) * envelope
-        
-        # Apply intensity variation
-        intensity = random.uniform(0.3, 0.8)
-        crackle *= intensity
-        
-        # Add to audio
-        end_idx = min(crackle_start + crackle_duration, num_samples)
-        audio[crackle_start:end_idx] += crackle[:end_idx - crackle_start]
-    
-    # Add wood "settling" sounds (lower frequency pops)
-    num_pops = random.randint(1, 4)
-    for _ in range(num_pops):
-        pop_start = random.randint(0, max(1, num_samples - 3000))
-        pop_duration = random.randint(200, 800)
-        
-        t = np.arange(pop_duration) / sample_rate
-        
-        # Slower attack, longer decay for wood settling
-        envelope = (1 - np.exp(-t * 20)) * np.exp(-t * 8)
-        
-        # Lower frequencies for wood sounds
-        freq = random.uniform(200, 800)
-        pop_sound = np.sin(2 * np.pi * freq * t) * envelope * random.uniform(0.2, 0.5)
-        
-        end_idx = min(pop_start + pop_duration, num_samples)
-        audio[pop_start:end_idx] += pop_sound[:end_idx - pop_start]
-    
-    # Add subtle low-frequency fire rumble
-    t_full = np.arange(num_samples) / sample_rate
-    rumble1 = np.sin(2 * np.pi * 25 * t_full) * 0.03
-    rumble2 = np.sin(2 * np.pi * 45 * t_full) * 0.02
-    audio += rumble1 + rumble2
-    
-    # Apply final envelope to avoid clicks
-    fade_samples = min(1000, num_samples // 10)
-    if fade_samples > 0:
-        fade_in = np.linspace(0, 1, fade_samples)
-        fade_out = np.linspace(1, 0, fade_samples)
-        audio[:fade_samples] *= fade_in
-        audio[-fade_samples:] *= fade_out
-    
-    # Normalize and clip
-    audio = np.clip(audio * 0.6, -1.0, 1.0)
-    
-    # Apply volume multiplier
-    audio = audio * VOLUME_MULTIPLIER
-    audio = np.clip(audio, -1.0, 1.0)
-    
-    if channels == 2:
-        # Create stereo with slight variation for spatial feel
-        left = audio
-        right = audio * 0.95 + np.random.normal(0, 0.005, len(audio))
-        stereo = np.column_stack([left, right])
-    else:
-        stereo = audio.reshape(-1, 1)
-    
-    return stereo.astype(np.float32)
 
 def get_fire_color_at_height(led_index, num_leds, time_offset=0):
     """Get fire color based on LED position and animation state"""
@@ -216,16 +120,12 @@ def get_fire_color_at_height(led_index, num_leds, time_offset=0):
 def animate_fire_leds(writer):
     """Animate fire effect on LEDs"""
     print("[Fireplace] Starting LED fire animation...")
-    t = Time(CFG_LED.rate_state)
-    start_time = time.monotonic()
-    
     while True:
-        current_time = time.monotonic() - start_time
         rgb_array = np.zeros((CFG_LED.num_leds, 3), dtype=np.uint8)
         
         # Create fire effect for each LED
         for i in range(CFG_LED.num_leds):
-            color = get_fire_color_at_height(i, CFG_LED.num_leds, current_time)
+            color = get_fire_color_at_height(i, CFG_LED.num_leds)
             rgb_array[i] = color
         
         # Occasionally add some ember sparkles at random positions
@@ -234,16 +134,13 @@ def animate_fire_leds(writer):
             rgb_array[spark_led] = random.choice(EMBER_COLORS)
         
         # Update LEDs
-        with writer.buf() as b:
-            b["rgb"] = rgb_array
-        
-        t.tick()
+        writer["rgb"] = rgb_array
+        Loop.sleep()
 
 def play_fire_sounds(writer, audio_file=None):
     """Play fire sounds - either from file or generated"""
     print("[Fireplace] Starting fire sound playback...")
-    t = Time(CFG_AUDIO.update_rate)
-    chunk_size = CFG_AUDIO.chunk_size
+    chunk_size = CFG_AUDIO.speaker_chunk_size
     
     if audio_file is not None:
         print("[Fireplace] Using real fireplace audio!")
@@ -268,38 +165,13 @@ def play_fire_sounds(writer, audio_file=None):
             if len(chunk) < chunk_size:
                 pad_size = chunk_size - len(chunk)
                 if CFG_AUDIO.channels == 2:
-                    padding = np.zeros((pad_size, 2), dtype=np.float32)
+                    padding = np.zeros((pad_size, 2), dtype=np.int16)
                 else:
-                    padding = np.zeros((pad_size, 1), dtype=np.float32)
+                    padding = np.zeros((pad_size, 1), dtype=np.int16)
                 chunk = np.vstack((chunk, padding))
             
-            with writer.buf() as b:
-                b["audio"] = chunk
-            t.tick()
-    else:
-        print("[Fireplace] Using generated fireplace sounds...")
-        # Use the original generated audio
-        while True:
-            # Generate a chunk of crackling fire sound
-            sound_duration = random.uniform(0.8, 1.5)  # Vary duration slightly
-            audio_chunk = generate_crackling_sound(sound_duration)
-            
-            # Play the sound chunk by chunk
-            for i in range(0, len(audio_chunk), chunk_size):
-                chunk = audio_chunk[i:i + chunk_size]
-                
-                # Pad if necessary
-                if len(chunk) < chunk_size:
-                    pad_size = chunk_size - len(chunk)
-                    if CFG_AUDIO.channels == 2:
-                        padding = np.zeros((pad_size, 2), dtype=np.float32)
-                    else:
-                        padding = np.zeros((pad_size, 1), dtype=np.float32)
-                    chunk = np.vstack((chunk, padding))
-                
-                with writer.buf() as b:
-                    b["audio"] = chunk
-                t.tick()
+            writer["audio"] = chunk
+            Loop.sleep()
 
 if __name__ == "__main__":
     print("🔥 [Fireplace] Starting cozy fireplace simulation...")
@@ -315,7 +187,7 @@ if __name__ == "__main__":
     
     try:
         with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led, \
-             Writer("/audio.speaker", Type("speakerphone_audio")) as w_audio:
+             Writer("/audio.speaker", Type("speakerphone_audio")(CFG_AUDIO.speaker_chunk_size, CFG_AUDIO.speaker_channels)) as w_audio:
             
             # Start LED animation in a separate thread
             led_thread = threading.Thread(target=animate_fire_leds, args=(w_led,), daemon=True)

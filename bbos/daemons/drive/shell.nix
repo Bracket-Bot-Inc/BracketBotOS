@@ -32,6 +32,7 @@ pkgs.mkShell {
       pip install -e ../../..
     else
       source venv/bin/activate
+      sudo setcap 'cap_sys_nice=eip' $(readlink -f $(command -v python3))
       echo "Virtual environment activated. Use 'deactivate' to exit."
     fi
   '';

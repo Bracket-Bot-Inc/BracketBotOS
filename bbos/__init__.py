@@ -1,21 +1,16 @@
 import importlib.util, sys
 from pathlib import Path
 
-# prevent "from bbos import *"
-__all__ = []
-
-def __dir__():
-    return []  # no public names
-
 # PEP 562
 _symbols = {
+    "Type": "bbos.registry",
     "Config": "bbos.registry",
     "register": "bbos.registry",
-    "Type": "bbos.registry",
+    "realtime": "bbos.registry",
     "Writer": "bbos.shm",
     "Reader": "bbos.shm",
-    "Time": "bbos.time",
     "AppManager": "bbos.app_manager",
+    "Loop": "bbos.time",
 }
 
 _collected = False
@@ -36,7 +31,6 @@ def _collect_daemon_constants():
     base = Path(__file__).parent / "daemons"
     if not base.is_dir():
         return
-
     for sub in base.iterdir():
         const = sub / "constants.py"
         if const.is_file():
@@ -47,4 +41,7 @@ def _collect_daemon_constants():
             module = importlib.util.module_from_spec(spec)
             sys.modules[
                 mod_name] = module  # register before exec to avoid recursion
-            spec.loader.exec_module(module)  # ⟵ runs @register decorators
+            try:
+                spec.loader.exec_module(module)
+            except Exception as e:
+                print(f"[!] Error loading {mod_name}: {e}")

@@ -1,5 +1,4 @@
-from bbos import Reader, Writer, Type, Config, Time
-from bbos.os_utils import config_realtime_process, Priority
+from bbos import Reader, Writer, Type, Config, Loop
 import sys
 import mrcal
 import cv2
@@ -11,7 +10,6 @@ CFG_D = Config("depth")
 
 
 def main():
-    config_realtime_process(1, Priority.CTRL_HIGH)
     models = [ mrcal.cameramodel(f) \
                for f in ('cache/camera-0.cameramodel',
                          'cache/camera-1.cameramodel') ]
@@ -25,14 +23,10 @@ def main():
             Writer('/camera.depth', lambda: Type("camera_depth")(rec_h, rec_w)) as w_depth, \
             Writer('/camera.points', lambda: Type("camera_points")(rec_h, rec_w)) as w_points:
 
-        t = Time(20)
-
         print('starting depth')
         while True:
             if r_jpeg.ready():
-                stale, d = r_jpeg.get()
-                if stale: continue
-                stereo = cv2.imdecode(d["jpeg"], cv2.IMREAD_COLOR)
+                stereo = cv2.imdecode(r_jpeg.data["jpeg"], cv2.IMREAD_COLOR)
 
                 if stereo is None: continue
                 images_rectified = [
@@ -82,9 +76,8 @@ def main():
                     b['points'] = mrcal.transform_point_Rt(
                         Rt_cam0_rect0, b['points'][:])
                     b['colors'] = images_rectified[0]
-                    b['timestamp'] = d['timestamp']
-            t.tick()
-    print(t.stats)
+                    b['timestamp'] = r_jpeg.data['timestamp']
+            Loop.sleep()
 
 
 if __name__ == "__main__":

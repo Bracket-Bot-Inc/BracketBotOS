@@ -1,4 +1,5 @@
-from bbos.registry import register
+from bbos import register, realtime
+from bbos.os_utils import Priority
 
 import numpy as np
 
@@ -8,19 +9,22 @@ import numpy as np
 # ----------------------------------------------------------------------
 @register
 class speakerphone:
-    device = 0
-    sample_rate: int = 48_000
-    gain: float = 8 # tuned gain for mic
-    channels: int = 2
-    chunk_size: int = 960
+    speaker_device = 0
+    mic_device = 0
+    speaker_sample_rate: int = 48_000
+    mic_sample_rate: int = 48_000
+    speaker_channels: int = 2
+    mic_channels: int = 1
     update_rate: int = 50
+    speaker_chunk_size: int = speaker_sample_rate // update_rate
+    mic_chunk_size: int= mic_sample_rate // update_rate
 
 
 # ----------------------------------------------------------------------
 # Types
 # ----------------------------------------------------------------------
-@register
-def speakerphone_audio():
+@realtime(50, Priority.CTRL_HIGH, [2, 3])
+def speakerphone_audio(chunk_size, channels):
     return [
-        ("audio", np.float32, (speakerphone.chunk_size, speakerphone.channels)),  # chunk_size, channels
-    ] 
+        ("audio", np.int16, (chunk_size, channels)),  # chunk_size, channels
+    ]

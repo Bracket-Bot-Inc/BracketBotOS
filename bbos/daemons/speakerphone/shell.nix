@@ -1,5 +1,6 @@
 { pkgs ? import <nixpkgs> {} }:
 
+
 pkgs.mkShell {
   buildInputs = with pkgs; [
     python311
@@ -10,7 +11,9 @@ pkgs.mkShell {
     portaudio
     zlib
     libGL
+    swig                    # required for binding generation
     glibc
+    glibc.dev
     xorg.libX11
   ];
 
@@ -20,6 +23,7 @@ pkgs.mkShell {
     export LD_LIBRARY_PATH=${pkgs.libGL}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.xorg.libX11}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.portaudio}/lib:$LD_LIBRARY_PATH
+    export LD_LIBRARY_PATH=${pkgs.glibc.dev}/lib:$LD_LIBRARY_PATH
 
     if [ ! -d "venv" ]; then
       python -m venv venv

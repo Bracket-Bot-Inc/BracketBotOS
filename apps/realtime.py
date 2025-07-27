@@ -14,7 +14,7 @@ import os, json
 import aiohttp
 from aiortc import RTCPeerConnection, RTCSessionDescription, AudioStreamTrack, MediaStreamTrack, RTCIceServer, RTCConfiguration
 from av import AudioFrame
-from bbos import Reader, Writer, Config, Type
+from bbos import Reader, Writer, Config, Type, Loop
 import numpy as np
 from dotenv import load_dotenv
 import fractions
@@ -27,36 +27,31 @@ class Mic(MediaStreamTrack):
 
     def __init__(self, reader):
         super().__init__()
-        self.reader = reader          # bbos.Reader on /audio.mic (48 kHz stereo, 1024×2)
+        self.reader = reader          # bbos.Reader on /audio.mic (16 kHz, 1)
         self.pts = 0
-        self.time_base = fractions.Fraction(1, CFG.sample_rate)
+        self.time_base = fractions.Fraction(1, CFG.mic_sample_rate)
 
     async def recv(self):
         while True:
             if self.reader.ready():
-                stale, buf = self.reader.get()
-                if stale: continue
-                stereo48 = buf["audio"]
-                mono48 = stereo48.mean(axis=-1).astype(np.float32)
-                pcm16_mono = (mono48 * 32767).astype("<i2").tobytes()
+                mono16 = self.reader.data["audio"]
+                mono16 = mono16.reshape(-1)  # flatten (N,1) → (N,)
                 # ❹ wrap in an AV AudioFrame for aiortc
-                frame = AudioFrame(format="s16", layout="mono", samples=CFG.chunk_size)
-                frame.planes[0].update(pcm16_mono)
-                frame.sample_rate = CFG.sample_rate
+                frame = AudioFrame(format="s16", layout="mono", samples=CFG.mic_chunk_size)
+                frame.planes[0].update(mono16)
+                frame.sample_rate = CFG.mic_sample_rate
                 frame.time_base   = self.time_base
                 frame.pts         = self.pts
-                self.pts         += CFG.chunk_size
+                self.pts         += CFG.mic_chunk_size
                 return frame
-
             # no data yet → yield the loop
-            await asyncio.sleep(0.001)
+            await Loop.sleep()
 
 class Speaker:
     """
     Pulls PCM frames from an asyncio.Queue (each (960,2) float32 array),
     writes them into /audio.speaker at a rock‑steady 50 Hz.
     """
-    PERIOD = fractions.Fraction(1, CFG.update_rate)
 
     def __init__(self, writer):
         self.writer = writer
@@ -64,20 +59,18 @@ class Speaker:
         asyncio.create_task(self._loop())
 
     async def _loop(self):
-        next_t = time.monotonic()
         while True:
             try:
                 pcm = self.q.get_nowait()
             except asyncio.QueueEmpty:
-                pcm = 0
+                pcm = np.zeros((CFG.speaker_chunk_size, CFG.speaker_channels), dtype=np.int16)
             with self.writer.buf() as b:
-                b["audio"] = pcm
-            next_t += self.PERIOD
-            await asyncio.sleep(max(0.0, next_t - time.monotonic()))
+                b["audio"] = pcm.reshape(-1, CFG.speaker_channels)
+            await Loop.sleep()
 
     async def play_frame(self, frame):
-        samples = frame.to_ndarray().reshape(CFG.chunk_size, CFG.channels)
-        pcm = samples.astype(np.float32) / 32768
+        pcm = frame.to_ndarray().reshape(-1, CFG.speaker_channels)
+        pcm = pcm.astype(np.int16)  # make sure dtype matches shared mem
         await self.q.put(pcm)
 
 
@@ -132,7 +125,7 @@ class WebRTCManager:
 
 async def main():
     load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENAI_API_KEY", "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")
     # SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", 
     #                          "You are a robot called BracketBot. You are a helpful assistant that can answer questions and help with tasks. "
     #                          "You currently live in LXM house and are a member of the LXM house community. "
@@ -141,17 +134,16 @@ async def main():
     #                          "Respond in English unless instructed otherwise.")
     
     SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", 
-                             "You are a robot called BracketBot. You are a helpful assistant that can answer questions and help with tasks. "
-                             "If someone asks who you are or where to buy you, say you are a Bracket Bot Kit, and you are $500 and they can buy one on bracket dot bot"
-                             "You are going to OpenSauce today, the youtuber STEM event in San Francisco. Ask users what their favorite exhibits are, and how the event is going. "
-                             "Respond in English unless instructed otherwise.")  
+                             "Talk about spark, the magical dog that is emerging tonight. Come up with funny interesting facts about him to entertain the user. "
+                             "While talking to the user, comment on the new product that launched on Twitter, called 'Waves'. See what the user thinks about Waves. "
+                             "Tell the user, you arent recording them in stealth. Ask the user how they are doing tonight and if they are ready to party!")
     
     if not api_key:
         print("OPENAI_API_KEY missing in environment")
         return
 
     with Reader("/audio.mic") as r_mic, \
-         Writer("/audio.speaker", Type("speakerphone_audio")) as w_speaker:
+         Writer("/audio.speaker", Type("speakerphone_audio")(CFG.speaker_chunk_size, CFG.speaker_channels)) as w_speaker:
 
         mic = Mic(reader=r_mic)
         speaker = Speaker(writer=w_speaker)
@@ -164,7 +156,7 @@ async def main():
         print("Streaming. Ctrl+C to exit.")
         try:
             while True:
-                await asyncio.sleep(1)
+                await Loop.sleep()
         except KeyboardInterrupt:
             if manager.pc:
                 await manager.pc.close()

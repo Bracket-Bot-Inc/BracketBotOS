@@ -1,18 +1,13 @@
-from bbos import Writer, Config, Type, Time
-from bbos.os_utils import Priority, config_realtime_process
-
-import os, time, json, sys
-import numpy as np
+from bbos import Writer, Config, Type, Loop
+import os
 import fcntl
 import select
 import v4l2
 import mmap
 import ctypes
-from turbojpeg import decompress_to, PF
 
 
 def main():
-    config_realtime_process(3, Priority.CTRL_HIGH)
     CFG = Config("stereo")
     fd = os.open(f'/dev/video{CFG.dev}', os.O_RDWR)
 
@@ -56,27 +51,23 @@ def main():
     buf_type = ctypes.c_int(v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE)
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMON, buf_type)
     mv = memoryview(mmap_buf)
-    r = Time(CFG.rate)
-    with Writer('/camera.jpeg', lambda: Type("camera_jpeg")(buf.length)) as w:
+    with Writer('/camera.jpeg', Type("camera_jpeg")(buf.length)) as w:
         while True:
             # Queue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_QBUF, buf)
-            # Get raw MJPEG frame (zero-copy)
             # Wait for frame
             select.select([fd], [], [])
             # Dequeue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_DQBUF, buf)
-            stamp = Time.now()  # stamp as early as possible
             with w.buf() as b:
                 b['bytesused'] = buf.bytesused
                 b['jpeg'][:buf.bytesused] = mv[:buf.bytesused]
-                b['timestamp'] = stamp
-            r.tick()
+            Loop.sleep()
     # Cleanup
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMOFF, buf_type)
+    del mv
     mmap_buf.close()
     os.close(fd)
-    print(r.stats)
 
 
 if __name__ == "__main__":

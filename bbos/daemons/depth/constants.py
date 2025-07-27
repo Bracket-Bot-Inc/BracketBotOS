@@ -1,4 +1,5 @@
-from bbos.registry import register
+from bbos.registry import *
+from bbos.os_utils import Priority
 
 import numpy as np
 
@@ -15,14 +16,14 @@ class depth:
     prefilter_cap = 21
 
 
-@register
+@realtime(10, Priority.CTRL_MED, [0, 1])
 def camera_depth(height, width):
     return [
         ("depth", np.uint16, (height, width)),
     ]
 
 
-@register
+@realtime(10, Priority.CTRL_MED, [0, 1])
 def camera_points(height, width):
     return [
         ("points", np.float64, (height, width, 3)),

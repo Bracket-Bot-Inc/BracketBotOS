@@ -6,12 +6,10 @@
 #   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
-from bbos import Reader, Writer, Type, Time
-from bbos.os_utils import Priority, config_realtime_process, gateway
+from bbos import Reader, Writer, Type, Loop 
 from bbos.paths import KEY_PTH, CERT_PTH
 
 import signal, json, numpy as np
-import asyncio
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 import uvicorn
@@ -144,17 +142,13 @@ def run(w_ctrl, r_cam, port=8000):
         async def gen():
             while not _stop:  # quits on Ctrl-C
                 if r_cam.ready():
-                    stale, img = r_cam.get()
-                    if stale:
-                        continue
-                    size = int(img["bytesused"])
-                    jpeg = memoryview(img["jpeg"])[:size]
+                    size = int(r_cam.data["bytesused"])
+                    jpeg = memoryview(r_cam.data["jpeg"])[:size]
                     yield (b"--frame\r\n"
                            b"Content-Type: image/jpeg\r\n"
                            b"Content-Length: %d\r\n\r\n" % size + jpeg +
                            b"\r\n")
-                await asyncio.sleep(0.05)
-
+                await Loop.sleep()
         return StreamingResponse(gen(), headers=headers)
 
     @app.websocket("/ws")
@@ -168,10 +162,8 @@ def run(w_ctrl, r_cam, port=8000):
                 if "x" not in payload or "y" not in payload:
                     continue
                 cmd = np.array([payload['x'] * SPEED_ANG, payload['y'] * SPEED_LIN])
-                with w_ctrl.buf() as b:
-                    b["twist"] = cmd
-                    b['timestamp'] = Time.now()
-                await asyncio.sleep(0.01)
+                w_ctrl["twist"] = cmd
+                await Loop.sleep()
         except WebSocketDisconnect:
             print("[WS] Client disconnected")
 
@@ -187,8 +179,6 @@ def run(w_ctrl, r_cam, port=8000):
 
 
 def main():
-    config_realtime_process(3, Priority.CTRL_HIGH)
-    print("teleop webpage: https://" + gateway() + ":8000")
     with Writer('/drive.ctrl', Type("drive_ctrl")) as w_ctrl, \
          Reader('/camera.jpeg') as r_cam:
         run(w_ctrl, r_cam)

@@ -7,7 +7,7 @@
 #   "ncnn",
 # ]
 # ///
-from bbos import Config, Reader, Writer, Type, Time
+from bbos import Config, Reader, Writer, Type, Loop
 import os
 from pathlib import Path
 from ultralytics import YOLO
@@ -20,11 +20,11 @@ os.environ['ULTRALYTICS_QUIET'] = 'True'
 os.environ['DISABLE_ULTRALYTICS_VERSIONING_CHECK'] = 'True'
 
 
-TURN_SPEED = 2
+TURN_SPEED = 0.2
 CENTER_THRESHOLD = 0.05
-FORWARD_SPEED = 21.0 # Speed for moving forward/backward
-TARGET_WIDTH_RATIO = 0.2  # Target width of person relative to image width
-WIDTH_THRESHOLD = 0.02  # Acceptable range around target width
+FORWARD_SPEED = 1.0 # Speed for moving forward/backward
+TARGET_WIDTH_RATIO = 0.3  # Target width of person relative to image width
+WIDTH_THRESHOLD = 0.05  # Acceptable range around target width
 MODEL_PATH =  "yolov8n.pt"
 NCNN_MODEL_PATH = "yolov8n_ncnn_model"
 
@@ -37,15 +37,12 @@ def main():
     cmd = np.zeros(2)
     CFG = Config("stereo")
     img_width = CFG.width // 2
-    t = Time(15)
     with Reader("/camera.jpeg") as r_jpeg, \
         Writer("/drive.ctrl", Type("drive_ctrl")) as w_ctrl:
         while True:
             results = []
             if r_jpeg.ready():
-                stale, d = r_jpeg.get()
-                if stale: continue
-                img = np.array(decompress(d['jpeg'], PF.RGB))[:,:img_width,:]
+                img = np.array(decompress(r_jpeg.data['jpeg'], PF.RGB))[:,:img_width,:]
                 results = model(img, classes=[0],verbose=False)
 
             # Find the largest person detection
@@ -86,7 +83,7 @@ def main():
                 cmd[:] = [-TURN_SPEED*abs(x_error), forward_speed]
             with w_ctrl.buf() as b:
                 b['twist'] = cmd
-            t.tick()
+            Loop.sleep()
 
 if __name__ == "__main__":
     main()

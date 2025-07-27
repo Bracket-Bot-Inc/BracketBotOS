@@ -1,10 +1,11 @@
-from bbos import Reader, Writer, Type, Config
+from bbos import Reader, Config
 from bbos.paths import KEY_PTH, CERT_PTH
 from bbos.os_utils import who_ip
 
-import argparse, cv2, signal, subprocess, asyncio, uvicorn, re
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import argparse, cv2, signal, subprocess, uvicorn, re, glob
+from fastapi import FastAPI
 from fastapi.responses import HTMLResponse, StreamingResponse
+from pathlib import Path
 
 CFG = Config("stereo")
 GRID_WIDTH = 17
@@ -58,7 +59,7 @@ def _sigint(*_):
 signal.signal(signal.SIGINT, _sigint)
 
 
-def run(r_jpeg, rate, response_time=1, wait_time=5, port=8001):
+def run(r_jpeg, port=8001):
     # Specify the model ID
     app = FastAPI()
 
@@ -117,7 +118,6 @@ function sendStop() {
     async def feed():
         boundary = b"--frame\r\n"
         headers = {"Content-Type": "multipart/x-mixed-replace; boundary=frame"}
-        t = Time(20)
         folder = Path('cache')
         folder.mkdir(parents=True, exist_ok=True)
 
@@ -125,10 +125,7 @@ function sendStop() {
             i = 0
             while not _stop:  # quits on Ctrl-C
                 if r_jpeg.ready():
-                    stale, d = r_jpeg.get()
-                    if stale:
-                        continue
-                    img = cv2.imdecode(d['jpeg'], cv2.IMREAD_GRAYSCALE)
+                    img = cv2.imdecode(r_jpeg.data['jpeg'], cv2.IMREAD_GRAYSCALE)
                     found, corners = cv2.findChessboardCorners(
                         img, args.size, flags=cv2.CALIB_CB_ADAPTIVE_THRESH)
                     if found:
@@ -144,7 +141,7 @@ function sendStop() {
                         i += 1
                     success, res = cv2.imencode('.jpg', img)
                     if not success:
-                        res = d['jpeg'][:d['bytesused']]
+                        res = r_jpeg.data['jpeg'][:r_jpeg.data['bytesused']]
                     yield (b"--frame\r\n"
                            b"Content-Type: image/jpeg\r\n"
                            b"Content-Length: %d\r\n\r\n" % res.nbytes +

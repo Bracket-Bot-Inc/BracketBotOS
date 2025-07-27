@@ -8,19 +8,8 @@ import os
 import time
 import sys
 from pathlib import Path
-from bbos import Reader, Config, Time
+from bbos import Reader, Config, Loop
 
-# Configuration
-DEFAULT_CADENCE_MS = 500  # Default recording cadence in milliseconds
-
-def get_cadence():
-    """Get recording cadence from command line or use default."""
-    if len(sys.argv) > 1:
-        try:
-            return int(sys.argv[1])
-        except ValueError:
-            print(f"[!] Invalid cadence '{sys.argv[1]}', using default {DEFAULT_CADENCE_MS}ms")
-    return DEFAULT_CADENCE_MS
 
 OUTPUT_DIR = Path(".record_video")
 
@@ -31,31 +20,21 @@ def main():
     print(os.listdir())
     OUTPUT_DIR.mkdir(exist_ok=True)
     
-    # Get cadence and convert to Hz
-    cadence_ms = get_cadence()
-    cadence_hz = 1000 / cadence_ms
-    
     # Get camera config for context
     CFG = Config("stereo")
-    print(f"[+] Recording video at {cadence_hz:.1f} Hz ({cadence_ms}ms interval) to {OUTPUT_DIR}")
+    print(f"[+] Recording video to {OUTPUT_DIR}")
     print(f"[+] Camera: {CFG.width}x{CFG.height} @ {CFG.rate} fps")
     
     frame_count = 0
-    session_start = time.time()
-    session_id = int(session_start)
-    
-    t = Time(cadence_hz)
+
+    session_id = int(time.time())
     
     with Reader("/camera.jpeg") as r_jpeg:
         while True:
             if r_jpeg.ready():
-                stale, data = r_jpeg.get()
-                if stale:
-                    continue
-                
                 # Extract JPEG data 
-                jpeg_bytes = data['jpeg'][:data['bytesused']]
-                timestamp = data['timestamp']
+                jpeg_bytes = r_jpeg.data['jpeg'][:r_jpeg.data['bytesused']]
+                timestamp = r_jpeg.data['timestamp']
                 
                 # Generate filename with session ID, frame number, and timestamp
                 filename = f"{session_id}_{frame_count:06d}_{timestamp:.3f}.jpg"
@@ -66,12 +45,8 @@ def main():
                     f.write(jpeg_bytes)
                 
                 frame_count += 1
-                if frame_count % 10 == 0:  # Progress every 10 frames
-                    elapsed = time.time() - session_start
-                    rate = frame_count / elapsed
-                    print(f"[+] Recorded {frame_count} frames ({rate:.1f} fps avg)")
                 
-            t.tick()
+            Loop.sleep()
 
 if __name__ == "__main__":
     # Show usage if requested

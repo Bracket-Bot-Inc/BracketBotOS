@@ -1,9 +1,11 @@
 # registry.py
-from functools import wraps
+from typing import List
 from inspect import isclass
 from threading import Lock
 import numpy as np
 
+_realtime: dict[str, tuple[int, int]] = {}
+_rates: dict[str, float] = {}
 _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
 _lock = Lock()
@@ -26,6 +28,22 @@ def register(robj):
 
     return deco(robj)
 
+def realtime(rate: float, process_priority: int, target_cores: List[int]):
+    """Decorator that registers a type function with a frequency."""
+    def deco(obj):
+        key = obj.__name__
+        assert not isclass(obj), "frequency decorator must be used on a type function"
+
+        with _lock:
+            if key in _types:
+                raise ValueError(
+                    f"‘{key}’ already registered in {_types is _config and 'config' or 'types'}"
+                )
+            _types[key] = obj
+            _rates[key] = rate
+            _realtime[key] = (process_priority, target_cores)
+        return obj  # object remains intact
+    return deco
 
 # --- helpers ---------------------------------------------------------------
 class Type:
@@ -33,8 +51,7 @@ class Type:
         self._name = name
 
     def __call__(self, *args, **kwargs):
-        return _types[self._name](*args, **kwargs) + [("timestamp", np.float64)
-                                                      ]
+        return _types[self._name](*args, **kwargs)+[("timestamp", np.int64)], _rates[self._name], _realtime[self._name]
 
 
 class Config:
@@ -48,8 +65,7 @@ class Config:
 
 
 def all_types():
-    import numpy as np
-    return {k: v() + [("timestamp", np.float64)] for k, v in _types.items()}
+    return {k: v() + [("timestamp", np.int64)] for k, v in _types.items()}
 
 
 def all_cfg():

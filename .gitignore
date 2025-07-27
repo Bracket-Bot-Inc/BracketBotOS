@@ -1,3 +1,7 @@
+*wifi.txt
+mnt
+*.img
+*.xz
 *.pt
 *ncnn_model
 *.torchscript

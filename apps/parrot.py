@@ -2,17 +2,16 @@
 # /// script
 # dependencies = [
 #   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "scipy"
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Reader, Type, Config, Time
+from bbos import Writer, Reader, Type, Config, Loop
+from scipy.signal import resample_poly
 import time
 
 CFG = Config("speakerphone")
 DURATION = 5.0  # seconds
-CHUNK = CFG.chunk_size
-SAMPLE_RATE = CFG.sample_rate
-CHANNELS = CFG.channels
 
 if __name__ == "__main__":
     recorded = []
@@ -20,32 +19,37 @@ if __name__ == "__main__":
     print(f"[+] Recording for {DURATION} seconds...")
 
     with Reader("/audio.mic") as r_mic:
-        t = Time(CFG.update_rate)
         start = time.monotonic()
         while time.monotonic() - start < DURATION:
             if r_mic.ready():
-                stale, data = r_mic.get()
-                if stale: continue
-                recorded.append(data["audio"])
-            t.tick()
+                recorded.append(r_mic.data["audio"])
+            else:
+                recorded.append(np.zeros((CFG.mic_chunk_size, CFG.mic_channels), dtype=np.float32))
+            Loop.sleep()
 
     print("[+] Recording complete. Concatenating...")
 
     audio = np.concatenate(recorded, axis=0)
+    # Resample to match speaker sample rate
+    audio = resample_poly(audio.squeeze(), up=3, down=1)
+    print(audio.shape)
+    audio_48k_stereo = np.stack([audio, audio], axis=-1)  # shape (N, 2)
+    print(audio_48k_stereo.shape)
+
+    audio = np.clip(audio, -1.0, 1.0)
 
     # Optional: Clip to avoid overflow
-    np.clip(audio, -1.0, 1.0, out=audio)
-    print(f"[+] Playing back {len(audio) / SAMPLE_RATE:.2f} seconds...")
+    print(len(audio) / CFG.speaker_sample_rate)
+    print(f"[+] Playing back {len(audio) / CFG.speaker_sample_rate:.2f} seconds...")
 
-    with Writer("/audio.speaker", Type("speakerphone_audio")) as w_speak:
-        t = Time(CFG.update_rate)
-        for i in range(0, len(audio), CHUNK):
-            chunk = audio[i:i + CHUNK]
-            if chunk.shape[0] < CHUNK:
-                pad = np.zeros((CHUNK - chunk.shape[0], CHANNELS), dtype=np.float32)
+    with Writer("/audio.speaker", Type("speakerphone_audio")(CFG.speaker_chunk_size, CFG.speaker_channels)) as w_speak:
+        for i in range(0, len(audio_48k_stereo), CFG.speaker_chunk_size):
+            chunk = audio_48k_stereo[i:i + CFG.speaker_chunk_size]
+            if chunk.shape[0] < CFG.speaker_chunk_size:
+                pad = np.zeros((CFG.speaker_chunk_size - chunk.shape[0], CFG.speaker_channels), dtype=np.float32)
                 chunk = np.vstack((chunk, pad))
             with w_speak.buf() as b:
-                b["audio"] = chunk
-            t.tick()
+                b["audio"][:] = chunk
+            Loop.sleep()
 
     print("[+] Done.")

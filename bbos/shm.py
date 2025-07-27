@@ -1,19 +1,22 @@
-from bbos import Type
+from typing import List
+from bbos.registry import Type 
+from bbos.time import TimeLog, Loop, Realtime
 from bbos.os_utils import CACHE_LINE
 
-import os, json, inspect, time, contextlib, sys, traceback, ctypes, posix_ipc, mmap, numpy as np
+import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, mmap, numpy as np, time
 from pathlib import Path
 
-
+def _get_lockfile(name):
+    return f"/tmp{name}_lock"
 def _caller_sig():
     f = inspect.stack()[2]
     return f"{os.path.abspath(f.filename)}:{f.lineno}"
 
 
-def _write_lock(fd, sig, dtype):
+def _write_lock(fd, sig, dtype, rate, priority, cores):
     owner = Path(sys.modules['__main__'].__file__)
     owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
-    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "owner": owner}).encode())
+    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "rate": rate, "owner": owner, "priority": priority, "cores": cores}).encode())
 
 
 def json_descr_to_dtype(desc):
@@ -37,16 +40,18 @@ def json_descr_to_dtype(desc):
 
 
 class Writer:
-
-    def __init__(self, name, shmtype: Type):
-        shmdtype = np.dtype(shmtype())
+    def __init__(self, name, datatype: Type | List[tuple]):
+        shmtype, rate, (priority, cores) = datatype if isinstance(datatype, tuple) else datatype()
+        Loop.set_hz(rate)
+        Realtime.set_realtime(cores, priority)
+        shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
-        self._lockfile = f"/tmp{name}_lock"
+        self._lockfile = _get_lockfile(name)
         sig = _caller_sig()
         try:
             self._lock_fd = os.open(self._lockfile,
                                     os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            _write_lock(self._lock_fd, sig, shmdtype)
+            _write_lock(self._lock_fd, sig, shmdtype, rate, priority, cores)
         except FileExistsError:
             raise RuntimeError(
                 f"Writer for '{name}' exists, {self._lockfile})")
@@ -69,7 +74,7 @@ class Writer:
     @contextlib.contextmanager
     def buf(self):
         self._seq.value += 1  # mark as dirty (odd)
-        self._buf[0]['timestamp'] = time.monotonic()
+        self._buf[0]['timestamp'] = time.monotonic_ns()
         try:
             yield self._buf[0]
         finally:
@@ -78,7 +83,7 @@ class Writer:
     def __setitem__(self, idx, data):
         self._seq.value += 1  # odd → readers ignore
         self._buf[0][idx] = data
-        self._buf[0]['timestamp'] = time.monotonic()
+        self._buf[0]['timestamp'] = time.monotonic_ns()
         self._seq.value += 1  # even → publish
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -91,13 +96,14 @@ class Writer:
 
 
 class Reader:
-
     def __init__(self, name):
         self._name = name
-        self._lockfile = f"/tmp{name}_lock"
+        self._lockfile = _get_lockfile(name)
         self._lock_fd = None
         self._readable = False
         self._valid = False
+        self._tlog = TimeLog(name)
+        self._data = None
 
     def __enter__(self):
         return self
@@ -110,7 +116,10 @@ class Reader:
         if not self._readable:
             try:
                 with open(self._lockfile, 'r') as f:
-                    shmdtype = np.dtype(json_descr_to_dtype(json.load(f)["dtype"]))
+                    lock = json.load(f)
+                    shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
+                    Loop.set_hz(lock["rate"])
+                    Realtime.set_realtime(lock["cores"], lock["priority"])
             except:
                 self._readable = False
                 return self._readable
@@ -133,8 +142,8 @@ class Reader:
                 self._data[n] = self._buf[0][n]
             if s0 != self._seq[0]:
                 self._valid = False
-        else:
-            self._valid = False
+            if self._valid:
+                self._tlog.log()
         return self._readable and self._valid
 
     @property
@@ -143,11 +152,12 @@ class Reader:
 
     @property
     def readable(self):
-        return self._readable and self._valid
+        return self._readable
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_val, exc_tb)
         if self._lock_fd:
             os.unlink(self._lockfile)
-        return False
+        self._tlog.close()
+        return True

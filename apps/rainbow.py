@@ -3,8 +3,7 @@
 #   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
-from bbos import Writer, Reader, Type, Time, Config
-from bbos.os_utils import gateway
+from bbos import Writer, Type, Config, Loop
 
 import numpy as np
 RAINBOW = [
@@ -20,9 +19,7 @@ RAINBOW = [
 if __name__ == "__main__":
     CFG = Config("led_strip")
     with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_ctrl:
-        t = Time(CFG.rate_state)
         while True:
             for color in RAINBOW:
-                with w_ctrl.buf() as b:
-                    b["rgb"] = np.array([color] * CFG.num_leds, dtype=np.uint8)
-                t.tick()
+                w_ctrl["rgb"] = np.array([color] * CFG.num_leds, dtype=np.uint8)
+                Loop.sleep()
