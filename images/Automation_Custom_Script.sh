@@ -4,7 +4,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 ## clone repo and install
 cd /home/bracketbot
-git clone https://oauth2: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@github.com/raghavauppuluri13/BracketBotOS.git
+git clone -b ipc https://oauth2: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@github.com/raghavauppuluri13/BracketBotOS.git
 cd BracketBotOS
 ./install
 
