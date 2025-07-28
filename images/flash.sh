@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # Define the image file names
-RPI5="DietPi_OrangePi5Ultra-ARMv8-Bookworm.img.xz"
-ORANGE_PI="DietPi_RPi5-ARMv8-Bookworm.img.xz"
+ORANGE_PI="DietPi_OrangePi5Ultra-ARMv8-Bookworm.img.xz"
+RPI5="DietPi_RPi5-ARMv8-Bookworm.img.xz"
 
 # Check if an argument was provided
 if [ -z "$1" ]; then
@@ -48,9 +48,17 @@ fi
 echo "[*] Flashing $IMG_NAME to $DEVICE..."
 sudo dd if="$IMG_NAME" of="$DEVICE" bs=4M conv=fsync status=progress
 
+echo "[*] Waiting for kernel to re-read partition table..."
+sudo partprobe "$DEVICE"
+sleep 2
+
 echo "[*] Injecting custom config into root partition..."
 sudo mkdir -p mnt
 sudo mount ${DEVICE}2 mnt
+if [ ! -d "mnt/boot" ]; then
+    sudo umount mnt
+    sudo mount ${DEVICE}1 mnt
+fi
 sudo cp dietpi* mnt/boot
 sudo cp Automation_Custom_Script.sh mnt/boot
 sudo umount mnt

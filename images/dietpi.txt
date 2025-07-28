@@ -10,7 +10,7 @@
 # - Once applied during first run setup, the password is removed from this file, encrypted and stored to a safer location to be used by dietpi-software only.
 # - WARN: The default SSH server Dropbear does not support passwords over 100 bytes. Certain special characters, and such with accents, take 2 bytes.
 # - WARN: We cannot guarantee that all software options can handle special characters like $"|\.
-AUTO_SETUP_GLOBAL_PASSWORD=12345678
+AUTO_SETUP_GLOBAL_PASSWORD=1234
 
 ##### Language/Regional options #####
 # Locale e.g.: "en_GB.UTF-8" / "de_DE.UTF-8" | One entry and UTF-8 ONLY!
@@ -69,7 +69,7 @@ AUTO_UNMASK_LOGIND=0
 # - Add as many APT package names as you wish, separated by space.
 # - They will be installed after dietpi-software options and before the script defined via AUTO_SETUP_CUSTOM_SCRIPT_EXEC (see below) is executed.
 # - E.g. the following (without the leading "#") will install the APT packages iotop, iptables and xz-utils:
-AUTO_SETUP_APT_INSTALLS=iptables git network-manager network-manager-wifi iptables-nft nftables xz-utils curl iptables-persistent dnsmasq iw hostapd wpasupplicant 
+AUTO_SETUP_APT_INSTALLS=iptables git network-manager iproute2 nftables xz-utils curl iptables-persistent dnsmasq iw hostapd wpasupplicant avahi-daemon
 
 # Custom Script (pre-networking and pre-DietPi install)
 # - Allows you to automatically execute a custom script before network is up on first boot.
