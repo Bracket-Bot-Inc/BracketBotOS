@@ -13,7 +13,7 @@ SERVICES = {
                 "exec_start": f"{DAEMONS_DIR}/manager/result/bin/manager {DAEMONS_DIR}", 
                 "env": f""},
     "autostart": {"type": "simple", 
-            "exec_start": f"/bin/bash -c -l '{BIN_DIR}/autostart {APP_DIRS}'",
+            "exec_start": f"/bin/bash -c -l 'uv run \"{BIN_DIR}/autostart {APP_DIRS}\"'",
             "as_user": True,
             "env": "PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
 }
