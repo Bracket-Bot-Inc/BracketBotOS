@@ -52,6 +52,13 @@ configure_ssh() {
         sudo systemctl restart ssh || echo "Failed: restart ssh"
     fi
 }
+# restart wlan0 interface
+sudo ip link set wlan0 down
+sudo ip link set wlan0 up
+echo "Waiting for wlan0 to get an IP address..."
+while ! ip addr show wlan0 | grep -q 'inet '; do sleep 0.1; done
+echo "wlan0 interface is ready with IP address."
+
 create_virtual_interface
 bring_up_interface
 configure_hotspot
