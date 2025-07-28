@@ -120,7 +120,32 @@ clean = pkgs.writeShellApplication {
   '';
 };
 
+restart = pkgs.writeShellApplication {
+  name = "restart";
+  text = ''
+    set -eu
+    sudo systemctl kill -s SIGKILL manager
+    sudo systemctl kill -s SIGKILL autostart
+    find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
+    sudo systemctl restart manager
+    sudo systemctl restart autostart
+    echo "Restarted!"
+  '';
+};
+
+stop = pkgs.writeShellApplication {
+  name = "stop";
+  text = ''
+    set -eu
+    sudo systemctl kill -s SIGKILL manager
+    sudo systemctl kill -s SIGKILL autostart
+    find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
+    echo "Stopped!"
+  '';
+};
+
+
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate debug_service debug_daemons clean];
+  paths = [ manager calibrate debug_service debug_daemons restart stop];
 }
