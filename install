@@ -48,7 +48,7 @@ def check_and_install_nix():
     append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
     print("[!] Nix installation complete.")
     os.execvp("bash",
-              ["bash", "-l", "-c", f"_NIX_INSTALLED=1 python3 {__file__}"])
+              ["bash", "-l", "-c", f"_NIX_INSTALLED=1 uv run {__file__}"])
 
 
 def check_and_install_uv():
