@@ -1,9 +1,15 @@
 #!/bin/bash
 set -euxo pipefail
-adduser bracketbot
-usermod -aG sudo bracketbot
+
 deluser --remove-home dietpi
 rm -rf /home/dietpi
+
+adduser --disabled-password --gecos "" bracketbot
+echo "bracketbot:1234" | chpasswd
+
+usermod -aG sudo bracketbot
+SUDOERS_FILE="/etc/sudoers.d/bracketbot"
+echo "bracketbot ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE" chmod 0440 "$SUDOERS_FILE"
 
 runasuser() {
        su - bracketbot -c "cd /home/bracketbot; source ~/.bashrc; $*"
@@ -14,28 +20,31 @@ runasuser "uv python install 3.11"
 runasuser "git clone -b ipc https://oauth2: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@github.com/raghavauppuluri13/BracketBotOS.git"
 runasuser "cd BracketBotOS; uv run ./install"
 
-sudo apt purge ifupdown isc-dhcp-client isc-dhcp-server
+# allows uv python to run as nice
+runasuser "sudo setcap 'cap_sys_nice=eip' \$(readlink -f \$(uv python find))"
+
+# disable spammy kernel logs
+echo 'dmesg -n 1' >> /etc/rc.local
+
+sudo apt purge -y ifupdown isc-dhcp-client isc-dhcp-server
 
 sudo systemctl disable --now \
        ifupdown-pre.service \
        ifup@wlan0.service ifup@eth0.service \
-       dietpi-wifi-monitor.service
+       dietpi-wifi-monitor.service || true
 # Prevent accidental resurrection
 sudo systemctl mask networking.service ifupdown-pre.service
 
 printf "auto lo\niface lo inet loopback\n" | sudo tee /etc/network/interfaces
 
-sudo mkdir -p /etc/network/interfaces.d.disabled
-sudo mv /etc/network/interfaces.d/* /etc/network/interfaces.d.disabled/ 2>/dev/null || true
+sudo tee /etc/NetworkManager/conf.d/90-disable-mac-rand.conf >/dev/null <<'EOF'
+[device]
+wifi.scan-rand-mac-address=no
 
-# Make sure the kernel devices are now managed by NM
-sudo nmcli dev set wlan0 managed yes
-sudo nmcli dev set eth0  managed yes
-
+[connection]
+wifi.cloned-mac-address=permanent
+EOF
 sudo systemctl restart NetworkManager
-
-sudo ip link set wlan0 down
-sudo ip link set wlan0 up
 
 echo "Rebooting..."
 sudo reboot
