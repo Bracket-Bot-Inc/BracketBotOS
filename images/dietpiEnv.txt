@@ -1,0 +1,11 @@
+rootdev=UUID=d7c1ee6f-1985-4586-9aef-677d20464f99
+rootfstype=ext4
+# The init system logs to the console defined last.
+consoleargs=console=ttyFIQ0,1500000 console=tty1
+extraargs=net.ifnames=0
+docker_optimizations=off
+overlay_path=rockchip
+# Multiple prefixes are supported separated by space
+overlay_prefix=orangepi-5-ultra rockchip-rk3588 rk3588
+overlays=
+user_overlays=rk3588-uart2-m0

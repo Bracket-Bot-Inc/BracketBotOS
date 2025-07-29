@@ -1,4 +1,6 @@
-{ pkgs ? import <nixpkgs> {} }:
+let 
+pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/63dacb46bf939521bdc93981b4cbb7ecb58427a0.tar.gz") {};
+in
 pkgs.mkShell {
   buildInputs = with pkgs; [
     python311
@@ -24,9 +26,6 @@ pkgs.mkShell {
       python -m venv venv
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
-      # Add user to dialout group for UART communication
-      echo "Adding user to dialout group for UART permissions..."
-      sudo usermod -a -G dialout "$USER"
       sudo bash -c "curl https://cdn.odriverobotics.com/files/odrive-udev-rules.rules > /etc/udev/rules.d/91-odrive.rules && udevadm control --reload-rules && udevadm trigger"
       pip install PyYAML odrive==0.5.1.post0 pyserial
       pip install -e ../../..
