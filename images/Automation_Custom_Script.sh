@@ -9,7 +9,8 @@ echo "bracketbot:1234" | chpasswd
 
 usermod -aG sudo bracketbot
 SUDOERS_FILE="/etc/sudoers.d/bracketbot"
-echo "bracketbot ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE" chmod 0440 "$SUDOERS_FILE"
+echo "bracketbot ALL=(ALL) NOPASSWD:ALL" > "$SUDOERS_FILE"
+chmod 0440 "$SUDOERS_FILE"
 
 runasuser() {
        su - bracketbot -c "cd /home/bracketbot; source ~/.bashrc; $*"
@@ -30,6 +31,7 @@ sudo apt purge -y ifupdown isc-dhcp-client isc-dhcp-server
 
 sudo systemctl disable --now \
        ifupdown-pre.service \
+       dnsmasq.service \
        ifup@wlan0.service ifup@eth0.service \
        dietpi-wifi-monitor.service || true
 # Prevent accidental resurrection
