@@ -1,4 +1,4 @@
-from bbos import Reader, Time
+from bbos import Reader 
 from bbos.os_utils import user_ip
 
 import time
@@ -12,15 +12,10 @@ def main():
     print(f"[logger] Viewer URL: {viewer_url}")
     rr.serve_web(web_port=9090, server_memory_limit='500MB')
     rr.set_time("monotonic", timestamp=time.monotonic())
-    t = Time(10)
     with Reader("/camera.depth") as r_depth:
         while True:
             if r_depth.ready():
-                stale, d = r_depth.get()
-                if stale: continue
-                rr.log("depth_image", rr.Image(d['depth']))
-            t.tick()
-    print(t.stats)
+                rr.log("depth_image", rr.Image(r_depth.data['depth']))
 
 if __name__ == "__main__":
     pass

@@ -29,7 +29,7 @@ pkgs.mkShell {
       sudo usermod -a -G spi "$USER"
       
       # Install Python packages
-      pip install Pi5Neo>=1.0.0
+      pip install Pi5Neo
       pip install -e ../../..
     else
       source venv/bin/activate

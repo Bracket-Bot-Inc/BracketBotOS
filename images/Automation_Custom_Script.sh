@@ -16,7 +16,7 @@ runasuser() {
 }
 runasuser "curl -LsSf https://astral.sh/uv/install.sh | sh"
 runasuser "uv python install 3.11"
-## clone repo and install
+# clone repo and install
 runasuser "git clone -b ipc https://oauth2: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@github.com/raghavauppuluri13/BracketBotOS.git"
 runasuser "cd BracketBotOS; uv run ./install"
 

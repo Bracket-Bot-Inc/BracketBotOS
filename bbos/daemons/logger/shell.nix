@@ -5,6 +5,7 @@ pkgs.mkShell {
     python311
     python311.pkgs.virtualenv
     python311.pkgs.pip
+    python311.pkgs.numpy
     zlib
     python311.pkgs.evdev
     libGL

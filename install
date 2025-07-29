@@ -13,7 +13,7 @@ SERVICES = {
                 "exec_start": f"{DAEMONS_DIR}/manager/result/bin/manager {DAEMONS_DIR}", 
                 "env": f""},
     "autostart": {"type": "simple", 
-            "exec_start": f"/bin/bash -c -l 'uv run \"{BIN_DIR}/autostart {APP_DIRS}\"'",
+            "exec_start": f"/bin/bash -c -l 'uv run {BIN_DIR}/autostart {APP_DIRS}'",
             "as_user": True,
             "env": "PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
 }
@@ -175,9 +175,6 @@ def main():
         p = DAEMONS_DIR / service
         exec_path = f"{p.resolve()}/result/bin/{service}"
         install_service(service, exec_path, SERVICES[service])
-
-    # set cap_sys_nice for all python processes
-    subprocess.run("sudo setcap 'cap_sys_nice=eip' $(readlink -f $(uv python find))", shell=True, check=True)
 
     if add_to_PATH:
         add_to_PATH.append(str(Path(__file__).parent.absolute() / 'bin'))

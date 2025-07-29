@@ -16,7 +16,7 @@ class drive:
 
 @register
 class odrive:
-    serial_port: str = "/dev/ttyAMA1"
+    serial_port: str = "/dev/ttyS2"
     baudrate: int = 115200
     timeout: int = 15  # seconds
     left_axis: int = 0
