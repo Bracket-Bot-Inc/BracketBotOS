@@ -154,10 +154,18 @@ stop = pkgs.writeShellApplication {
   name = "stop";
   text = ''
     set -eu
-    sudo systemctl kill -s SIGKILL manager
-    sudo systemctl kill -s SIGKILL autostart
-    find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
-    echo "Stopped!"
+    if [ "$#" -eq 0 ]; then
+      sudo systemctl kill -s SIGKILL manager
+      sudo systemctl kill -s SIGKILL autostart
+      find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
+      echo "Stopped!"
+    else
+      for arg in "$@"; do
+        pkill -f "python daemon.py $arg" || true
+        rm -f "/tmp/$${arg}_lock" "/tmp/$${arg}.log"
+      done
+      echo "Stopped daemons: $*"
+    fi
   '';
 };
 
@@ -170,8 +178,32 @@ status = pkgs.writeShellApplication {
   '';
 };
 
+list = pkgs.writeShellApplication {
+  name = "list";
+  text = ''
+    set -eu
+    GREEN="\033[32m"
+    BLUE="\033[34m"
+    RESET="\033[0m"
+    
+    echo -e "$BLUE=== Running Daemons ===$RESET"
+    
+    if pgrep -f "python daemon.py" > /dev/null; then
+      pgrep -f "python daemon.py" | while read -r pid; do
+        cmd=$(ps -p "$pid" -o args= 2>/dev/null || echo "")
+        daemon_name=$(echo "$cmd" | awk '/python daemon\.py/ {print $3}')
+        if [ -n "$daemon_name" ]; then
+          echo -e "$GREEN✓ $daemon_name$RESET (PID: $pid)"
+        fi
+      done
+    else
+      echo "No daemons running"
+    fi
+  '';
+};
+
 
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate debug_service debug_daemons restart stop timing status];
+  paths = [ manager calibrate debug_service debug_daemons restart stop timing status list];
 }
