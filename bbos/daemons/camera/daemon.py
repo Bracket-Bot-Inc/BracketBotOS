@@ -1,4 +1,4 @@
-from bbos import Writer, Config, Type, Loop
+from bbos import Writer, Config, Type
 import os
 import fcntl
 import select
@@ -62,7 +62,6 @@ def main():
             with w.buf() as b:
                 b['bytesused'] = buf.bytesused
                 b['jpeg'][:buf.bytesused] = mv[:buf.bytesused]
-            Loop.sleep()
     # Cleanup
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMOFF, buf_type)
     del mv

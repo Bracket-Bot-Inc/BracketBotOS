@@ -3,16 +3,17 @@
 #   "fastapi",
 #   "uvicorn",
 #   "wsproto",
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
-from bbos import Reader, Writer, Type, Loop 
+from bbos import Reader, Writer, Type
 from bbos.paths import KEY_PTH, CERT_PTH
 
 import signal, json, numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, StreamingResponse
 import uvicorn
+import asyncio
 
 SPEED_LIN =12.0  # m s⁻¹  forward/back
 SPEED_ANG = 0.5  # rad s⁻¹ CCW+
@@ -148,7 +149,7 @@ def run(w_ctrl, r_cam, port=8000):
                            b"Content-Type: image/jpeg\r\n"
                            b"Content-Length: %d\r\n\r\n" % size + jpeg +
                            b"\r\n")
-                await Loop.sleep()
+                await asyncio.sleep(0.05)
         return StreamingResponse(gen(), headers=headers)
 
     @app.websocket("/ws")
@@ -163,7 +164,7 @@ def run(w_ctrl, r_cam, port=8000):
                     continue
                 cmd = np.array([payload['x'] * SPEED_ANG, payload['y'] * SPEED_LIN])
                 w_ctrl["twist"] = cmd
-                await Loop.sleep()
+                await asyncio.sleep(0.05)
         except WebSocketDisconnect:
             print("[WS] Client disconnected")
 

@@ -57,8 +57,11 @@ class AppManager:
         os.environ["PATH"] += f"/home/{CURRENT_USER}/.local/bin"
         log_fd = open(f"/tmp/app-{app}.log", "wb", 0)
         os.dup2(log_fd.fileno(), 1); os.dup2(log_fd.fileno(), 2)
-        print(f"[dashboard] uv run {str(self.app_paths[app])}")
-        os.execvp("uv", ["uv", "run", str(self.app_paths[app])])     # replaces the process
+        venv_path = str(self.app_paths[app].parent / ".venv")
+        if Path(venv_path).exists():
+            os.execvp("bash", ["bash", "-c", f"source {venv_path}/bin/activate && exec python {self.app_paths[app]}"])
+        else:
+            os.execvp("uv", ["uv", "run", str(self.app_paths[app])])
 
     # ── dashboard/stop side ───────────────────────────────────────────────
     def stop_app(self, app, timeout=PROCESS_STOP_TIMEOUT):

@@ -1,6 +1,5 @@
-let 
-pkgs = import (fetchTarball "https://github.com/NixOS/nixpkgs/archive/63dacb46bf939521bdc93981b4cbb7ecb58427a0.tar.gz") {};
-in
+{ pkgs ? import <nixpkgs> {} }:
+
 pkgs.mkShell {
   buildInputs = with pkgs; [
     python311
@@ -24,8 +23,8 @@ pkgs.mkShell {
       python -m venv venv
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
-      pip install rerun-sdk
-      pip install -e ../../..
+      pip install rerun-sdk --force-reinstall
+      pip install -e ../../.. --force-reinstall
     else
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."

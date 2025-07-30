@@ -40,10 +40,8 @@ def json_descr_to_dtype(desc):
 
 
 class Writer:
-    def __init__(self, name, datatype: Type | List[tuple]):
+    def __init__(self, name, datatype: Type | List[tuple], realtime=False):
         shmtype, rate, (priority, cores) = datatype if isinstance(datatype, tuple) else datatype()
-        Loop.set_hz(rate)
-        Realtime.set_realtime(cores, priority)
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
         self._lockfile = _get_lockfile(name)
@@ -52,6 +50,9 @@ class Writer:
             self._lock_fd = os.open(self._lockfile,
                                     os.O_CREAT | os.O_EXCL | os.O_RDWR)
             _write_lock(self._lock_fd, sig, shmdtype, rate, priority, cores)
+            Loop.set_hz(rate)
+            if realtime:
+                Realtime.set_realtime(cores, priority)
         except FileExistsError:
             raise RuntimeError(
                 f"Writer for '{name}' exists, {self._lockfile})")
@@ -63,28 +64,44 @@ class Writer:
         self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
                                   mmap.PROT_READ | mmap.PROT_WRITE)
         self._seq = ctypes.c_uint32.from_buffer(self._mapfile, 0)
+        self._seq.value = 0
         self._buf = np.ndarray(1,
                                dtype=shmdtype,
                                buffer=memoryview(self._mapfile)[CACHE_LINE:])
+        self._latency = 1./rate
         self._shm.close_fd()
+        self._prev_write = -1
 
     def __enter__(self):
         return self
 
     @contextlib.contextmanager
     def buf(self):
+        now = time.monotonic()
+        if self._prev_write < 0:
+            self._prev_write = now
+        update = now - self._prev_write >= self._latency
         self._seq.value += 1  # mark as dirty (odd)
-        self._buf[0]['timestamp'] = time.monotonic_ns()
         try:
-            yield self._buf[0]
+            self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
+            yield self._buf[0] if update else np.zeros_like(self._buf[0])
         finally:
             self._seq.value += 1  # mark as published (even)
+            if update:
+                self._prev_write = now
+        Loop.keeptime()
 
     def __setitem__(self, idx, data):
-        self._seq.value += 1  # odd → readers ignore
-        self._buf[0][idx] = data
-        self._buf[0]['timestamp'] = time.monotonic_ns()
-        self._seq.value += 1  # even → publish
+        now = time.monotonic()
+        if self._prev_write < 0:
+            self._prev_write = now
+        if now - self._prev_write > self._latency:
+            self._seq.value += 1  # odd → readers ignore
+            self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
+            self._buf[0][idx] = data
+            self._seq.value += 1  # even → publish
+            self._prev_write = now
+        Loop.keeptime()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
@@ -96,8 +113,9 @@ class Writer:
 
 
 class Reader:
-    def __init__(self, name):
+    def __init__(self, name, realtime=False):
         self._name = name
+        self._realtime = realtime
         self._lockfile = _get_lockfile(name)
         self._lock_fd = None
         self._readable = False
@@ -118,8 +136,9 @@ class Reader:
                 with open(self._lockfile, 'r') as f:
                     lock = json.load(f)
                     shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
-                    Loop.set_hz(lock["rate"])
-                    Realtime.set_realtime(lock["cores"], lock["priority"])
+                    if self._realtime:
+                        Loop.set_hz(lock["rate"])
+                        Realtime.set_realtime(lock["cores"], lock["priority"])
             except:
                 self._readable = False
                 return self._readable
@@ -134,17 +153,26 @@ class Reader:
                                 buffer=memoryview(self._mapfile)[CACHE_LINE:])
             self._data = np.zeros_like(self._buf)[0]
             self._shm.close_fd()
+        data = self._read()
+        stale = data['timestamp'] == self._data['timestamp']
+        self._data = data
+        if not stale:
+            self._tlog.log()
+        return not stale
 
-        if not self._seq[0] & 1:
+    def _read(self):
+        """Guarantees a good read"""
+        while True:
             s0 = self._seq[0]
-            self._valid = self._buf[0]['timestamp'] != self._data['timestamp']
-            for n in self._data.dtype.names:
-                self._data[n] = self._buf[0][n]
-            if s0 != self._seq[0]:
-                self._valid = False
-            if self._valid:
-                self._tlog.log()
-        return self._readable and self._valid
+            if s0 & 1:          # writer busy → spin
+                time.sleep(0)
+                continue
+            s1 = self._seq[0]   # re‑read before copy
+            if s1 != s0:        # writer slipped in
+                continue
+            data = self._buf[0].copy()   # 300 µs copy
+            if self._seq[0] == s0:       # still identical & even → success
+                return data
 
     @property
     def data(self):

@@ -10,7 +10,6 @@ _symbols = {
     "Writer": "bbos.shm",
     "Reader": "bbos.shm",
     "AppManager": "bbos.app_manager",
-    "Loop": "bbos.time",
 }
 
 _collected = False

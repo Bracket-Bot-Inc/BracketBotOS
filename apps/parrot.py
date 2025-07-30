@@ -1,12 +1,11 @@
-# NOAUTO
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "scipy"
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Reader, Type, Config, Loop
+from bbos import Writer, Reader, Type, Config
 from scipy.signal import resample_poly
 import time
 
@@ -25,7 +24,6 @@ if __name__ == "__main__":
                 recorded.append(r_mic.data["audio"])
             else:
                 recorded.append(np.zeros((CFG.mic_chunk_size, CFG.mic_channels), dtype=np.float32))
-            Loop.sleep()
 
     print("[+] Recording complete. Concatenating...")
 
@@ -50,6 +48,5 @@ if __name__ == "__main__":
                 chunk = np.vstack((chunk, pad))
             with w_speak.buf() as b:
                 b["audio"][:] = chunk
-            Loop.sleep()
 
     print("[+] Done.")

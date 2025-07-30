@@ -1,11 +1,10 @@
-# NOAUTO
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Reader, Type, Config, Loop 
+from bbos import Writer, Reader, Type, Config
 from bbos.time import Realtime
 from bbos.os_utils import Priority
 
@@ -116,5 +115,3 @@ if __name__ == "__main__":
             else:
                 set_leds_smooth(w_led, OFF, 0)
                 current_color = OFF
-            
-            Loop.sleep()

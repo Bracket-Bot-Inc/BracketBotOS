@@ -1,9 +1,9 @@
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
-from bbos import Writer, Type, Config, Loop
+from bbos import Writer, Type, Config
 
 import numpy as np
 RAINBOW = [
@@ -22,4 +22,3 @@ if __name__ == "__main__":
         while True:
             for color in RAINBOW:
                 w_ctrl["rgb"] = np.array([color] * CFG.num_leds, dtype=np.uint8)
-                Loop.sleep()

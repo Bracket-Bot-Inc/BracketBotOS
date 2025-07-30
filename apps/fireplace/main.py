@@ -1,11 +1,10 @@
-# NOAUTO
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 import numpy as np
-from bbos import Writer, Type, Config, Loop
+from bbos import Writer, Type, Config
 import threading
 import random
 import math
@@ -135,7 +134,6 @@ def animate_fire_leds(writer):
         
         # Update LEDs
         writer["rgb"] = rgb_array
-        Loop.sleep()
 
 def play_fire_sounds(writer, audio_file=None):
     """Play fire sounds - either from file or generated"""
@@ -171,7 +169,6 @@ def play_fire_sounds(writer, audio_file=None):
                 chunk = np.vstack((chunk, padding))
             
             writer["audio"] = chunk
-            Loop.sleep()
 
 if __name__ == "__main__":
     print("🔥 [Fireplace] Starting cozy fireplace simulation...")

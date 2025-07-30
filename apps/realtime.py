@@ -1,7 +1,6 @@
-# NOAUTO
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "aiohttp",
 #   "aiortc",
 #   "av",
@@ -14,7 +13,7 @@ import os, json
 import aiohttp
 from aiortc import RTCPeerConnection, RTCSessionDescription, AudioStreamTrack, MediaStreamTrack, RTCIceServer, RTCConfiguration
 from av import AudioFrame
-from bbos import Reader, Writer, Config, Type, Loop
+from bbos import Reader, Writer, Config, Type
 import numpy as np
 from dotenv import load_dotenv
 import fractions
@@ -44,8 +43,7 @@ class Mic(MediaStreamTrack):
                 frame.pts         = self.pts
                 self.pts         += CFG.mic_chunk_size
                 return frame
-            # no data yet → yield the loop
-            await Loop.sleep()
+            await asyncio.sleep(0)
 
 class Speaker:
     """
@@ -66,7 +64,7 @@ class Speaker:
                 pcm = np.zeros((CFG.speaker_chunk_size, CFG.speaker_channels), dtype=np.int16)
             with self.writer.buf() as b:
                 b["audio"] = pcm.reshape(-1, CFG.speaker_channels)
-            await Loop.sleep()
+            await asyncio.sleep(0)
 
     async def play_frame(self, frame):
         pcm = frame.to_ndarray().reshape(-1, CFG.speaker_channels)
@@ -156,7 +154,7 @@ async def main():
         print("Streaming. Ctrl+C to exit.")
         try:
             while True:
-                await Loop.sleep()
+                await asyncio.sleep(0)
         except KeyboardInterrupt:
             if manager.pc:
                 await manager.pc.close()

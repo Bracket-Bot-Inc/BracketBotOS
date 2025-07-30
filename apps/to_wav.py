@@ -1,14 +1,13 @@
-# NOAUTO
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "soundfile"          # lightweight, perfect for streamed WAV output
 # ]
 # ///
 import numpy as np
 import soundfile as sf
 import time
-from bbos import Reader, Loop, Config
+from bbos import Reader, Config
 
 CFG       = Config("speakerphone")     # your usual config object
 DURATION  = 5.0                        # seconds to capture
@@ -49,7 +48,6 @@ with Reader("/audio.mic") as r_mic:
                               CFG.mic_channels), dtype=np.int16)
 
         sf_writer.write(chunk)   # 🔑 stream the chunk straight into the WAV
-        Loop.sleep()             # yields CPU (your usual helper)
 
 # --------------------------------------------------------------------------- #
 # 3. Always close the writer so the WAV header is finalized.

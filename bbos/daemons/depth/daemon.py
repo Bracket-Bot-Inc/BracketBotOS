@@ -1,4 +1,4 @@
-from bbos import Reader, Writer, Type, Config, Loop
+from bbos import Reader, Writer, Type, Config
 import sys
 import mrcal
 import cv2
@@ -77,8 +77,6 @@ def main():
                         Rt_cam0_rect0, b['points'][:])
                     b['colors'] = images_rectified[0]
                     b['timestamp'] = r_jpeg.data['timestamp']
-            Loop.sleep()
-
 
 if __name__ == "__main__":
     pass

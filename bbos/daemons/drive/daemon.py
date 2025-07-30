@@ -1,5 +1,7 @@
-from bbos import Reader, Writer, Config, Type, Loop
+from bbos import Reader, Writer, Config, Type
 from driver import ODriveUART
+import numpy as np
+import time
 
 CFG_drive = Config("drive")
 CFG_odrive = Config("odrive")
@@ -28,10 +30,9 @@ if __name__ == "__main__":
             if r_ctrl.ready():
                 vd, wd = map(float, r_ctrl.data['twist'])  # desired linear, angular
                 vd_l, vd_r = vd - wd * R, vd + wd * R
-            if not r_ctrl.readable:
+            if not r_ctrl.readable or (np.datetime64(time.time_ns(), "ns") - r_ctrl.data['timestamp']) > np.timedelta64(200, "ms"):
                 vd_l, vd_r = 0, 0
             od.set_speed_mps_left(vd_l)
             od.set_speed_mps_right(vd_r)
-            Loop.sleep()
     od.stop_left()
     od.stop_right()

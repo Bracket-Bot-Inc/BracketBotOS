@@ -1,4 +1,4 @@
-from bbos import Reader, Config, Loop
+from bbos import Reader, Config
 
 import numpy as np
 from pi5neo import Pi5Neo
@@ -19,6 +19,5 @@ if __name__ == "__main__":
                     for i in range(CFG.num_leds):
                         neo.set_led_color(i, *list(r_ctrl.data['rgb'][i]))
             neo.update_strip()
-            Loop.sleep()
     neo.clear_strip()
     neo.update_strip()

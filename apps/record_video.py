@@ -1,6 +1,6 @@
 # /// script
 # dependencies = [
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 
@@ -8,7 +8,7 @@ import os
 import time
 import sys
 from pathlib import Path
-from bbos import Reader, Config, Loop
+from bbos import Reader, Config
 
 
 OUTPUT_DIR = Path(".record_video")
@@ -46,8 +46,6 @@ def main():
                 
                 frame_count += 1
                 
-            Loop.sleep()
-
 if __name__ == "__main__":
     # Show usage if requested
     if len(sys.argv) > 1 and sys.argv[1] in ['-h', '--help']:

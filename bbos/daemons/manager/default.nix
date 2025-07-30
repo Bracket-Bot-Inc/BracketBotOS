@@ -36,6 +36,22 @@ let
     '';
   };
 
+timing = pkgs.writeShellApplication {
+  name = "timing";
+  text = ''
+  for f in /tmp/*_time_lock; do
+  [ -f "$f" ] || continue
+  if raw=$(dd if="$f" bs=8 count=1 2>/dev/null | od -An -t d8); then
+    val=$(echo "$raw" | awk '{print $1}')
+    if [ "$val" -ne 0 ] 2>/dev/null; then
+      freq=$(awk -v v="$val" 'BEGIN { printf "%.2f", 1/(v * 1e-9) }')
+      echo "$(basename "$f"): $freq Hz"
+    fi
+  fi
+done
+  '';
+};
+
 debug_daemons = pkgs.writeShellApplication {
   name = "debug-daemons";
   text = ''
@@ -145,8 +161,17 @@ stop = pkgs.writeShellApplication {
   '';
 };
 
+status = pkgs.writeShellApplication {
+  name = "status";
+  text = ''
+    set -eu
+    host=$(hostname)
+    echo "http://$host.local:9090/?url=rerun%2Bhttp://$host.local:9876/proxy"
+  '';
+};
+
 
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate debug_service debug_daemons restart stop];
+  paths = [ manager calibrate debug_service debug_daemons restart stop timing status];
 }

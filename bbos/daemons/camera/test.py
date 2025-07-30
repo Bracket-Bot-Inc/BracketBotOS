@@ -1,7 +1,6 @@
-from bbos import Reader, Loop
+from bbos import Reader
 
 with Reader('/camera.jpeg') as r:
-    i = 0
-    while Loop.sleep():
+    while True:
         if r.ready():
-            i += 1
+            print(r.data['bytesused'])

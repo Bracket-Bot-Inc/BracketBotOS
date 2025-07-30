@@ -4,7 +4,7 @@
 #   "fastapi",
 #   "uvicorn",
 #   "wsproto",
-#   "bbos @ /home/GREEN/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 import asyncio
