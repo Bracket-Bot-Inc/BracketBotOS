@@ -11,7 +11,7 @@ import numpy as np
 class led_strip:
     rate_state: int = 20  # Hz - LED state update rate
     num_leds: int = 30  # Number of LEDs in the strip
-    spi_device: str = "/dev/spidev4.1"  # SPI device for LED communication
+    spi_device: str = "/dev/spidev1.1"  # SPI device for LED communication
     spi_speed: int = 800  # SPI speed in kHz (800 kHz for WS2812B)
 
 # ----------------------------------------------------------------------
