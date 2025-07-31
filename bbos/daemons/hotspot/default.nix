@@ -14,7 +14,7 @@ hotspot = pkgs.writeShellApplication {
     VIRTUAL_IFACE="wlan0-ap"
   
     create_virtual_interface() {
-    if ! iw dev | grep -q "$VIRTUAL_IFACE"; then
+    if ! sudo iw dev | grep -q "$VIRTUAL_IFACE"; then
         echo "Creating virtual interface $VIRTUAL_IFACE..."
         sudo iw dev wlan0 interface add "$VIRTUAL_IFACE" type __ap || echo "Failed to add virtual interface. Is iw installed?"
     else
