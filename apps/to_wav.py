@@ -10,7 +10,7 @@ import time
 from bbos import Reader, Config
 
 CFG       = Config("speakerphone")     # your usual config object
-DURATION  = 5.0                        # seconds to capture
+DURATION  = 10.0                        # seconds to capture
 OUT_PATH  = "mic_capture.wav"          # output file
 
 # --------------------------------------------------------------------------- #
@@ -36,21 +36,13 @@ print(f"[+] Writing {DURATION} s of mic audio to {OUT_PATH} …")
 # --------------------------------------------------------------------------- #
 with Reader("/audio.mic") as r_mic:
     start = time.monotonic()
-
+    i = 0
     while time.monotonic() - start < DURATION:
         if r_mic.ready():
-            # Grab the chunk from shared memory
-            print("🎙️  got chunk", r_mic.data["audio"][0, :4])  # first few samples
-            chunk = r_mic.data["audio"]          # shape (chunk_size, channels)
-        else:
-            # Mic not ready?  Write silence for that slice.
-            chunk = np.zeros((CFG.mic_chunk_size,
-                              CFG.mic_channels), dtype=np.int16)
-
-        sf_writer.write(chunk)   # 🔑 stream the chunk straight into the WAV
-
-# --------------------------------------------------------------------------- #
-# 3. Always close the writer so the WAV header is finalized.
-# --------------------------------------------------------------------------- #
+            i += 1
+            chunk = r_mic.data["audio"]
+            sf_writer.write(chunk)
+            print(r_mic.data["timestamp"])
 sf_writer.close()
+print(f"[+] Wrote {i} chunks")
 print(f"[+] Done. Saved to {OUT_PATH}")

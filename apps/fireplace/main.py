@@ -5,10 +5,10 @@
 # ///
 import numpy as np
 from bbos import Writer, Type, Config
-import threading
 import random
 import math
 import os
+import time
 
 CFG_LED = Config("led_strip")
 CFG_AUDIO = Config("speakerphone")
@@ -116,59 +116,74 @@ def get_fire_color_at_height(led_index, num_leds, time_offset=0):
     # Apply intensity to color
     return tuple(int(c * intensity) for c in base_color)
 
-def animate_fire_leds(writer):
-    """Animate fire effect on LEDs"""
-    print("[Fireplace] Starting LED fire animation...")
+def update_fire_leds(writer, time_offset):
+    """Update fire effect on LEDs"""
+    rgb_array = np.zeros((CFG_LED.num_leds, 3), dtype=np.uint8)
+    
+    # Create fire effect for each LED
+    for i in range(CFG_LED.num_leds):
+        color = get_fire_color_at_height(i, CFG_LED.num_leds, time_offset)
+        rgb_array[i] = color
+    
+    # Occasionally add some ember sparkles at random positions
+    if random.random() < 0.1:
+        spark_led = random.randint(CFG_LED.num_leds // 2, CFG_LED.num_leds - 1)
+        rgb_array[spark_led] = random.choice(EMBER_COLORS)
+    
+    # Update LEDs
+    writer["rgb"] = rgb_array
+
+def get_next_audio_chunk(audio_file, audio_pos, chunk_size):
+    """Get the next audio chunk and update position"""
+    if audio_file is None:
+        # Return silence if no audio file
+        if CFG_AUDIO.speaker_channels == 2:
+            return np.zeros((chunk_size, 2), dtype=np.int16), 0
+        else:
+            return np.zeros((chunk_size, 1), dtype=np.int16), 0
+    
+    # Get the next chunk from the loaded audio
+    chunk = audio_file[audio_pos:audio_pos + chunk_size]
+    
+    # If we've reached the end, loop back
+    if len(chunk) < chunk_size:
+        remaining = chunk_size - len(chunk)
+        new_audio_pos = 0  # Reset to beginning
+        loop_chunk = audio_file[new_audio_pos:new_audio_pos + remaining]
+        if len(loop_chunk) > 0:
+            chunk = np.vstack((chunk, loop_chunk)) if len(chunk) > 0 else loop_chunk
+        new_audio_pos = remaining
+    else:
+        new_audio_pos = audio_pos + chunk_size
+    
+    # Pad if still necessary
+    if len(chunk) < chunk_size:
+        pad_size = chunk_size - len(chunk)
+        if CFG_AUDIO.speaker_channels == 2:
+            padding = np.zeros((pad_size, 2), dtype=np.int16)
+        else:
+            padding = np.zeros((pad_size, 1), dtype=np.int16)
+        chunk = np.vstack((chunk, padding))
+    
+    return chunk, new_audio_pos
+
+def run_fireplace(w_led, w_audio, audio_file=None):
+    """Run fireplace simulation in single thread"""
+    print("[Fireplace] Starting single-threaded fireplace simulation...")
+    
+    chunk_size = CFG_AUDIO.speaker_chunk_size
+    audio_pos = 0
+    start_time = time.time()
+    
     while True:
-        rgb_array = np.zeros((CFG_LED.num_leds, 3), dtype=np.uint8)
-        
-        # Create fire effect for each LED
-        for i in range(CFG_LED.num_leds):
-            color = get_fire_color_at_height(i, CFG_LED.num_leds)
-            rgb_array[i] = color
-        
-        # Occasionally add some ember sparkles at random positions
-        if random.random() < 0.1:
-            spark_led = random.randint(CFG_LED.num_leds // 2, CFG_LED.num_leds - 1)
-            rgb_array[spark_led] = random.choice(EMBER_COLORS)
+        current_time = time.time() - start_time
         
         # Update LEDs
-        writer["rgb"] = rgb_array
-
-def play_fire_sounds(writer, audio_file=None):
-    """Play fire sounds - either from file or generated"""
-    print("[Fireplace] Starting fire sound playback...")
-    chunk_size = CFG_AUDIO.speaker_chunk_size
-    
-    if audio_file is not None:
-        print("[Fireplace] Using real fireplace audio!")
-        # Loop the real audio file
-        audio_pos = 0
-        while True:
-            # Get the next chunk from the loaded audio
-            chunk = audio_file[audio_pos:audio_pos + chunk_size]
-            
-            # If we've reached the end, loop back
-            if len(chunk) < chunk_size:
-                remaining = chunk_size - len(chunk)
-                audio_pos = 0  # Reset to beginning
-                loop_chunk = audio_file[audio_pos:audio_pos + remaining]
-                if len(loop_chunk) > 0:
-                    chunk = np.vstack((chunk, loop_chunk)) if len(chunk) > 0 else loop_chunk
-                audio_pos = remaining
-            else:
-                audio_pos += chunk_size
-            
-            # Pad if still necessary
-            if len(chunk) < chunk_size:
-                pad_size = chunk_size - len(chunk)
-                if CFG_AUDIO.channels == 2:
-                    padding = np.zeros((pad_size, 2), dtype=np.int16)
-                else:
-                    padding = np.zeros((pad_size, 1), dtype=np.int16)
-                chunk = np.vstack((chunk, padding))
-            
-            writer["audio"] = chunk
+        update_fire_leds(w_led, current_time)
+        
+        # Get and play next audio chunk
+        audio_chunk, audio_pos = get_next_audio_chunk(audio_file, audio_pos, chunk_size)
+        w_audio["audio"] = audio_chunk
 
 if __name__ == "__main__":
     print("🔥 [Fireplace] Starting cozy fireplace simulation...")
@@ -179,21 +194,17 @@ if __name__ == "__main__":
     if loaded_audio is not None:
         print("🔥 [Fireplace] Real fireplace audio loaded!")
     else:
-        print("🔥 [Fireplace] Using generated fireplace sounds...")
+        print("🔥 [Fireplace] Using silence (no audio file found)...")
         print(f"🔥 [Fireplace] To use real audio, put your fireplace audio file at: {AUDIO_FILE_PATH}")
     
     try:
         with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led, \
-             Writer("/audio.speaker", Type("speakerphone_audio")(CFG_AUDIO.speaker_chunk_size, CFG_AUDIO.speaker_channels)) as w_audio:
-            
-            # Start LED animation in a separate thread
-            led_thread = threading.Thread(target=animate_fire_leds, args=(w_led,), daemon=True)
-            led_thread.start()
+             Writer("/audio.speaker", Type("speakerphone_speaker")) as w_audio:
             
             print("🔥 [Fireplace] Fire is burning! Press Ctrl+C to extinguish...")
             
-            # Run audio in main thread
-            play_fire_sounds(w_audio, loaded_audio)
+            # Run everything in single thread
+            run_fireplace(w_led, w_audio, loaded_audio)
             
     except KeyboardInterrupt:
         print("\n🔥 [Fireplace] Extinguishing fire... Goodbye!")

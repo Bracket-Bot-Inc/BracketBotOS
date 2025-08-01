@@ -9,22 +9,29 @@ import numpy as np
 # ----------------------------------------------------------------------
 @register
 class speakerphone:
-    speaker_device = 0
-    mic_device = 0
-    speaker_sample_rate: int = 48_000
-    mic_sample_rate: int = 48_000
-    speaker_channels: int = 2
+    speaker_device = "Respeaker Lite"
+    mic_device = "Respeaker Lite"
+    speaker_sample_rate: int = 16_000
+    speaker_channels: int = 1
+    mic_sample_rate: int = 16_000
     mic_channels: int = 1
-    update_rate: int = 50
-    speaker_chunk_size: int = speaker_sample_rate // update_rate
-    mic_chunk_size: int= mic_sample_rate // update_rate
+    speaker_ms: int = 50
+    mic_ms: int = 50
+    speaker_chunk_size: int = speaker_sample_rate // 1000 * speaker_ms
+    mic_chunk_size: int = mic_sample_rate // 1000 * mic_ms * 2
 
 
 # ----------------------------------------------------------------------
 # Types
 # ----------------------------------------------------------------------
-@realtime(50, Priority.CTRL_HIGH, [2, 3])
-def speakerphone_audio(chunk_size, channels):
+@realtime(ms=speakerphone.speaker_ms+5)
+def speakerphone_speaker():
     return [
-        ("audio", np.int16, (chunk_size, channels)),  # chunk_size, channels
+        ("audio", np.int16, (speakerphone.speaker_chunk_size, speakerphone.speaker_channels)),  # chunk_size, channels
+    ]
+
+@realtime(ms=speakerphone.mic_ms)
+def speakerphone_mic():
+    return [
+        ("audio", np.int16, (speakerphone.mic_chunk_size, speakerphone.mic_channels)),  # chunk_size, channels
     ]

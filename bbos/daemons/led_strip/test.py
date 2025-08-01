@@ -1,8 +1,3 @@
-# /// script
-# dependencies = [
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
-# ]
-# ///
 from bbos import Writer, Type, Config
 import time
 import numpy as np

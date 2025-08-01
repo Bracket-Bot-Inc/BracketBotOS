@@ -1,4 +1,4 @@
-import struct, sys, os, time, numpy as np, asyncio
+import math, struct, sys, os, time, numpy as np
 from pathlib import Path
 
 # https://github.com/commaai/openpilot/blob/master/common/util.py#L23
@@ -37,7 +37,7 @@ def _get_lockfile(name):
 class TimeLog:
     def __init__(self, name):
         self._name = name
-        self._buf = MovingAverage(50)
+        self._buf = MovingAverage(10)
         self._f = os.open(_get_lockfile(name),
              os.O_WRONLY | os.O_CREAT | os.O_DSYNC,
              0o444)
@@ -75,29 +75,47 @@ class TimeRead:
 
     
 class Loop:
-    _latency = 0.5
+    _latency = 100 # ms
     _last = -1
+    _requested_ms = set()
+    _triggers = {}
     _num_calls = 0
     _i = 0
     @staticmethod
     def keeptime():
-        if Loop._i == 0:
-            Loop._i = (Loop._i + 1) % Loop._num_calls
-            if Loop._last < 0:
+        if Loop._i == Loop._num_calls - 1:
+            Loop._i = 0 
+            if Loop._last > 0:
+                now = time.monotonic()
+                sleep_for = 1e-3*Loop._latency - (now - Loop._last)
+                Loop._last = now
+                if sleep_for >= 0 or abs(sleep_for) < 1.5e-3:
+                    if abs(sleep_for) < 1.5e-3:
+                        sleep_for = 1e-3*Loop._latency
+                    time.sleep(sleep_for)
+                else:
+                    print(f"[+] no sleep: sleep_for: {sleep_for}ms")
+            else:
                 Loop._last = time.monotonic()
-                return
-            now = time.monotonic()
-            sleep_for = Loop._latency - (now - Loop._last)
-            Loop._last = now
-            if sleep_for > 0:
-                time.sleep(sleep_for)
+            for trigger, reset in Loop._triggers.values():
+                trigger[0] = (trigger[0] + 1) % reset
         else:
-            Loop._i = (Loop._i + 1) % Loop._num_calls
+            Loop._i += 1
+    
+    @staticmethod
+    def init():
+        Loop._num_calls += 1
 
     @staticmethod
-    def set_hz(hz):
-        Loop._num_calls += 1
-        Loop._latency = min(Loop._latency, 1./hz)
+    def set_ms(ms, trigger):
+        assert ms > 0 and isinstance(ms, int)
+        if not ms in Loop._requested_ms:
+            Loop._requested_ms.add(ms)
+            Loop._latency = math.gcd(*Loop._requested_ms)
+        if not hex(id(trigger)) in Loop._triggers:
+            Loop._triggers[hex(id(trigger))] = ([trigger, int(ms / Loop._latency)])
+            print(f"[+] Loop._latency: {Loop._latency}ms")
+            print(Loop._triggers)
 
 class Realtime:
     pri = 20

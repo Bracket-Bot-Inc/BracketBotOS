@@ -40,7 +40,7 @@ if __name__ == "__main__":
     print(len(audio) / CFG.speaker_sample_rate)
     print(f"[+] Playing back {len(audio) / CFG.speaker_sample_rate:.2f} seconds...")
 
-    with Writer("/audio.speaker", Type("speakerphone_audio")(CFG.speaker_chunk_size, CFG.speaker_channels)) as w_speak:
+    with Writer("/audio.speaker", Type("speakerphone_speaker")) as w_speak:
         for i in range(0, len(audio_48k_stereo), CFG.speaker_chunk_size):
             chunk = audio_48k_stereo[i:i + CFG.speaker_chunk_size]
             if chunk.shape[0] < CFG.speaker_chunk_size:

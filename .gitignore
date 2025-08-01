@@ -1,4 +1,7 @@
 .venv*
+*openvino*
+yolo8n*
+*.safetensor
 *wifi.txt
 mnt
 *.img

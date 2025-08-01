@@ -17,7 +17,7 @@ class stereo:
     f_x = (width / 2) / (2 * np.tan(np.deg2rad(xfov) / 2))
 
 
-@realtime(15, Priority.CTRL_HIGH, [0,1,2,3,4,5,6,7])
+@realtime(ms=60)
 def camera_jpeg(buflen):
     return [
         ("bytesused", np.uint32),

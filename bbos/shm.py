@@ -8,15 +8,16 @@ from pathlib import Path
 
 def _get_lockfile(name):
     return f"/tmp{name}_lock"
+
 def _caller_sig():
     f = inspect.stack()[2]
     return f"{os.path.abspath(f.filename)}:{f.lineno}"
 
 
-def _write_lock(fd, sig, dtype, rate, priority, cores):
+def _write_lock(fd, sig, dtype, latency):
     owner = Path(sys.modules['__main__'].__file__)
     owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
-    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "rate": rate, "owner": owner, "priority": priority, "cores": cores}).encode())
+    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "latency": latency, "owner": owner}).encode())
 
 
 def json_descr_to_dtype(desc):
@@ -40,8 +41,8 @@ def json_descr_to_dtype(desc):
 
 
 class Writer:
-    def __init__(self, name, datatype: Type | List[tuple], realtime=False):
-        shmtype, rate, (priority, cores) = datatype if isinstance(datatype, tuple) else datatype()
+    def __init__(self, name, datatype: Type | List[tuple]):
+        shmtype, latency = datatype if isinstance(datatype, tuple) else datatype()
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
         self._lockfile = _get_lockfile(name)
@@ -49,13 +50,17 @@ class Writer:
         try:
             self._lock_fd = os.open(self._lockfile,
                                     os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            _write_lock(self._lock_fd, sig, shmdtype, rate, priority, cores)
-            Loop.set_hz(rate)
-            if realtime:
-                Realtime.set_realtime(cores, priority)
+            _write_lock(self._lock_fd, sig, shmdtype, latency)
         except FileExistsError:
             raise RuntimeError(
                 f"Writer for '{name}' exists, {self._lockfile})")
+
+        # set loop trigger
+        Loop.init()
+        self._trigger = [0] # mutable counter
+        Loop.set_ms(latency, self._trigger)
+
+        # create shared memory
         self._shm = posix_ipc.SharedMemory(
             name,
             flags=posix_ipc.O_CREAT,
@@ -68,39 +73,30 @@ class Writer:
         self._buf = np.ndarray(1,
                                dtype=shmdtype,
                                buffer=memoryview(self._mapfile)[CACHE_LINE:])
-        self._latency = 1./rate
         self._shm.close_fd()
-        self._prev_write = -1
 
     def __enter__(self):
         return self
 
+    def _update(self): 
+        return self._trigger[0] == 0
+
     @contextlib.contextmanager
     def buf(self):
-        now = time.monotonic()
-        if self._prev_write < 0:
-            self._prev_write = now
-        update = now - self._prev_write >= self._latency
         self._seq.value += 1  # mark as dirty (odd)
         try:
             self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
-            yield self._buf[0] if update else np.zeros_like(self._buf[0])
+            yield self._buf[0] if self._update() else np.zeros_like(self._buf[0])
         finally:
             self._seq.value += 1  # mark as published (even)
-            if update:
-                self._prev_write = now
         Loop.keeptime()
 
     def __setitem__(self, idx, data):
-        now = time.monotonic()
-        if self._prev_write < 0:
-            self._prev_write = now
-        if now - self._prev_write > self._latency:
+        if self._update():
             self._seq.value += 1  # odd → readers ignore
             self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
             self._buf[0][idx] = data
             self._seq.value += 1  # even → publish
-            self._prev_write = now
         Loop.keeptime()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -122,6 +118,8 @@ class Reader:
         self._valid = False
         self._tlog = TimeLog(name)
         self._data = None
+        self._trigger = [0] # mutable counter
+        Loop.init()
 
     def __enter__(self):
         return self
@@ -129,6 +127,7 @@ class Reader:
     def ready(self):
         if not os.path.exists(self._lockfile):
             self._readable = False
+            Loop.keeptime()
             return self._readable
         # wait until the writer has created the lock-file
         if not self._readable:
@@ -136,11 +135,11 @@ class Reader:
                 with open(self._lockfile, 'r') as f:
                     lock = json.load(f)
                     shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
-                    if self._realtime:
-                        Loop.set_hz(lock["rate"])
-                        Realtime.set_realtime(lock["cores"], lock["priority"])
+                    self._trigger[0] = 0
+                    Loop.set_ms(lock["latency"], self._trigger)
             except:
                 self._readable = False
+                Loop.keeptime()
                 return self._readable
             self._readable = True
             size = shmdtype.itemsize + CACHE_LINE
@@ -158,6 +157,7 @@ class Reader:
         self._data = data
         if not stale:
             self._tlog.log()
+        Loop.keeptime()
         return not stale
 
     def _read(self):

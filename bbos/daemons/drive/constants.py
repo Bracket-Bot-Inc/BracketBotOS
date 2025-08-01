@@ -33,18 +33,18 @@ class odrive:
 # ----------------------------------------------------------------------
 
 
-@realtime(50, Priority.CTRL_HIGH, [0,1,2,3,4,5,6,7])
+@realtime(ms=20)
 def drive_ctrl():
     return [("twist", (np.float32, 2))]  # linear, angular
 
 
-@realtime(50, Priority.CTRL_HIGH, [0,1,2,3,4,5,6,7])
+@realtime(ms=20)
 def drive_state():
     return [("pos", (np.float32, 2)), ("vel", (np.float32, 2)),
             ("torque", (np.float32, 2))]
 
 
-@realtime(1, Priority.CTRL_LOW, [0,1,2,3,4,5,6,7])
+@realtime(ms=1000)
 def drive_status():
     return [
         ("voltage", np.float32),

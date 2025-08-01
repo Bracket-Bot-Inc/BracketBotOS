@@ -1,3 +1,11 @@
+# /// script
+# dependencies = [
+#   "ultralytics",
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "turbojpeg-rpi",
+#   "openvino",
+# ]
+# ///
 from bbos import Config, Reader, Writer, Type
 import os, time
 from pathlib import Path
@@ -16,9 +24,8 @@ CENTER_THRESHOLD = 0.05
 FORWARD_SPEED = 2.0 # Speed for moving forward/backward
 TARGET_WIDTH_RATIO = 0.3  # Target width of person relative to image width
 WIDTH_THRESHOLD = 0.05  # Acceptable range around target width
-MODEL_PATH =  "yolov8n.pt"
-OPENVINO_MODEL_PATH = "yolov8n_openvino_model"
-# NCNN_MODEL_PATH = "yolov8n_ncnn_model"
+MODEL_PATH = "yolov8n.pt"
+OPENVINO_MODEL_PATH = "yolov8n_openvino_model"  # Not used anymore
 
 # Speed control parameters
 MAX_FORWARD_SPEED = 10  # Maximum speed when person is far
@@ -26,15 +33,14 @@ MIN_FORWARD_SPEED = 0.3  # Minimum speed when person is close
 SPEED_SCALE_FACTOR = 3.0  # How aggressively speed changes with distance
 
 def main():
-    # Export to OpenVINO if not already done
+    # Load the PyTorch model directly
+    print("Loading YOLO model...")
     if not os.path.exists(OPENVINO_MODEL_PATH):
-        print("Exporting model to OpenVINO format...")
         model = YOLO(MODEL_PATH)
-        model.export(format="openvino")  # creates 'yolov8n_openvino_model/'
-        print("Export complete!")
+        model.export(format="openvino", dynamic=True)
     
-    # Load the OpenVINO model
-    print("Loading OpenVINO model...")
+    # Initialize OpenVINO runtime
+
     model = YOLO(OPENVINO_MODEL_PATH)
     cmd = np.zeros(2)
     CFG = Config("stereo")

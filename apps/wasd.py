@@ -19,7 +19,6 @@ def press(key):
     global writer
     if writer is None:
         return
-        
     if key.lower() == 'w':
         # Forward: positive linear velocity, zero angular
         writer['twist'] = np.array([SPEED, 0.0], dtype=np.float32)

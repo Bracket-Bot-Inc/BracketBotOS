@@ -1,5 +1,6 @@
 from bbos import Reader 
 from bbos.os_utils import user_ip
+from bbos.time import Loop
 
 import time
 import rerun as rr
@@ -13,7 +14,10 @@ def main():
     with Reader("/camera.jpeg") as r_jpeg,  \
          Reader("/drive.ctrl") as r_ctrl,   \
          Reader("/drive.state") as r_state, \
-         Reader("/drive.status") as r_status:
+         Reader("/drive.status") as r_status, \
+         Reader("/audio.mic") as r_mic,  \
+         Reader("/led_strip.ctrl") as r_led,  \
+         Reader("/audio.speaker") as r_speak:
         while True:
             if r_jpeg.ready():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
@@ -32,8 +36,16 @@ def main():
                 for field in r_status.data.dtype.names:
                     if field != 'timestamp':
                         rr.set_time("monotonic", timestamp=r_status.data['timestamp'])
-                        rr.log(f"/drive/status/{field}", rr.Scalars(r_status.data[field]),)
-            time.sleep(0.1)
+                        rr.log(f"/drive/status/{field}", rr.Scalars(r_status.data[field]))
+            if r_mic.ready():
+                rr.set_time("monotonic", timestamp=r_mic.data['timestamp'])
+                rr.log("/audio/mic", rr.Scalars(r_mic.data['audio'].mean()))
+            if r_speak.ready():
+                rr.set_time("monotonic", timestamp=r_speak.data['timestamp'])
+                rr.log("/audio/speaker", rr.Scalars(r_speak.data['audio'].mean()))
+            if r_led.ready():
+                rr.set_time("monotonic", timestamp=r_led.data['timestamp'])
+                rr.log("/led_strip", rr.Scalars(r_led.data['rgb']))
 
 if __name__ == "__main__":
     main()

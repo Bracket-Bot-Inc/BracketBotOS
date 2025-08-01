@@ -4,8 +4,7 @@ from inspect import isclass
 from threading import Lock
 import numpy as np
 
-_realtime: dict[str, tuple[int, int]] = {}
-_rates: dict[str, float] = {}
+_latencies: dict[str, float] = {}
 _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
 _lock = Lock()
@@ -28,7 +27,7 @@ def register(robj):
 
     return deco(robj)
 
-def realtime(rate: float, process_priority: int, target_cores: List[int]):
+def realtime(ms: int):
     """Decorator that registers a type function with a frequency."""
     def deco(obj):
         key = obj.__name__
@@ -40,8 +39,7 @@ def realtime(rate: float, process_priority: int, target_cores: List[int]):
                     f"‘{key}’ already registered in {_types is _config and 'config' or 'types'}"
                 )
             _types[key] = obj
-            _rates[key] = rate
-            _realtime[key] = (process_priority, target_cores)
+            _latencies[key] = ms
         return obj  # object remains intact
     return deco
 
@@ -51,7 +49,7 @@ class Type:
         self._name = name
 
     def __call__(self, *args, **kwargs):
-        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _rates[self._name], _realtime[self._name]
+        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _latencies[self._name]
 
 
 class Config:
@@ -65,7 +63,7 @@ class Config:
 
 
 def all_types():
-    return {k: v() + [("timestamp", np.float64)] for k, v in _types.items()}
+    return {k: v() + [("timestamp", 'datetime64[ns]')] for k, v in _types.items()}
 
 
 def all_cfg():
