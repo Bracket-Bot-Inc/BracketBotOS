@@ -66,7 +66,7 @@ class Speaker:
     async def play_frame(self, frame):
         try:
             audio_data = frame.to_ndarray()
-            print(f"Raw frame: shape={audio_data.shape}, max_val={np.max(np.abs(audio_data))}")
+            #print(f"Raw frame: shape={audio_data.shape}, max_val={np.max(np.abs(audio_data))}")
             
             # Flatten if needed (remove extra dimensions)
             if audio_data.ndim > 1 and audio_data.shape[0] == 1:
@@ -74,14 +74,14 @@ class Speaker:
             
             # Check what OpenAI actually reports
             frame_sample_rate = getattr(frame, 'sample_rate', 48000)
-            print(f"Frame reports {frame_sample_rate}Hz, time_base={getattr(frame, 'time_base', 'none')}")
-            print(f"Resampling {len(audio_data)} samples from {frame_sample_rate}Hz to {CFG.speaker_sample_rate}Hz")
+            #print(f"Frame reports {frame_sample_rate}Hz, time_base={getattr(frame, 'time_base', 'none')}")
+            #print(f"Resampling {len(audio_data)} samples from {frame_sample_rate}Hz to {CFG.speaker_sample_rate}Hz")
             
             if CFG.speaker_sample_rate != frame_sample_rate:
                 resampled = signal.resample_poly(audio_data.astype(np.float32), 
-                                               CFG.speaker_sample_rate, frame_sample_rate)
+                                               CFG.speaker_sample_rate, frame_sample_rate * 2)
                 resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
-                print(f"After resample: {len(resampled)} samples, max_val={np.max(np.abs(resampled))}")
+                #print(f"After resample: {len(resampled)} samples, max_val={np.max(np.abs(resampled))}")
             else:
                 resampled = audio_data.astype(np.int16)
             
@@ -92,14 +92,13 @@ class Speaker:
             if len(self.buffer) >= CFG.speaker_chunk_size:
                 chunk = self.buffer[:CFG.speaker_chunk_size]
                 self.buffer = self.buffer[CFG.speaker_chunk_size:]
-                
                 # Convert to proper channels
                 if CFG.speaker_channels == 2:
                     chunk_shaped = np.repeat(chunk.reshape(-1, 1), 2, axis=1)
                 else:
                     chunk_shaped = chunk.reshape(-1, 1)
                 
-                print(f"Writing chunk: {chunk_shaped.shape}, max_val={np.max(np.abs(chunk_shaped))}")
+                #print(f"Writing chunk: {chunk_shaped.shape}, max_val={np.max(np.abs(chunk_shaped))}")
                 
                 # Write one chunk - match bbos timing
                 with self.writer.buf() as b:
@@ -199,10 +198,10 @@ class WebRTCManager:
                 "session": {
                     "modalities": ["audio"],
                     "instructions": self.system_prompt,
-                    "voice": "alloy",
+                    "voice": "shimmer",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
-                    "turn_detection": {"type": "server_vad", "threshold": 0.5}
+                    "turn_detection": {"type": "semantic_vad", "eagerness": "low"}
                 }
             }
             self.data_channel.send(json.dumps(session_update))
@@ -213,7 +212,7 @@ class WebRTCManager:
                 "type": "response.create",
                 "response": {
                     "modalities": ["audio"],
-                    "instructions": "Say hello and introduce yourself as BracketBot."
+                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering."
                 }
             }
             self.data_channel.send(json.dumps(response_create))
@@ -241,7 +240,7 @@ async def main():
     api_key = os.getenv("OPENAI_API_KEY")
     
     SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", 
-                             "You are a robot called BracketBot. Say hello and introduce yourself.")  
+                             "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.")  
     
     if not api_key:
         print("OPENAI_API_KEY missing in environment")
