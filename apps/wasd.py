@@ -4,44 +4,39 @@
 #   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
-from bbos import Writer, Type, Time
+from bbos import Writer, Type
 from sshkeyboard import listen_keyboard, stop_listening
 import numpy as np
 
 # Configuration
-SPEED = 0.5  # Linear speed in m/s
-TURN_SPEED = 3.0  # Angular speed in rad/s
+TURN_SPEED = 5.0  # Linear speed in m/s
+SPEED = 0.5  # Angular speed in rad/s
 # Global variables
 writer = None
 
 def press(key):
     """Handle key press events"""
-    global writer
+    global writer, pressed
     if writer is None:
         return
     if key.lower() == 'w':
-        # Forward: positive linear velocity, zero angular
-        writer['twist'] = np.array([SPEED, 0.0], dtype=np.float32)
+        writer['twist'] = np.array([-SPEED,0.0], dtype=np.float32)
     elif key.lower() == 's':
-        # Backward: negative linear velocity, zero angular
-        writer['twist'] = np.array([-SPEED, 0.0], dtype=np.float32)
+        writer['twist'] = np.array([SPEED, 0.0], dtype=np.float32)
     elif key.lower() == 'a':
-        # Turn left: zero linear velocity, positive angular
-        writer['twist'] = np.array([0.0, TURN_SPEED], dtype=np.float32)
-    elif key.lower() == 'd':
-        # Turn right: zero linear velocity, negative angular
         writer['twist'] = np.array([0.0, -TURN_SPEED], dtype=np.float32)
+    elif key.lower() == 'd':
+        writer['twist'] = np.array([0.0, TURN_SPEED], dtype=np.float32)
     elif key.lower() == 'q':
         # Quit
         stop_listening()
 
 def release(key):
     """Handle key release events - stop the robot"""
-    global writer
+    global writer, pressed
     if writer is None:
         return
-        
-    # Stop all movement on key release
+
     writer['twist'] = np.array([0.0, 0.0], dtype=np.float32)
 
 def main():
