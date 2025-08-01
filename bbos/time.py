@@ -81,6 +81,7 @@ class Loop:
     _triggers = {}
     _num_calls = 0
     _i = 0
+    _manage_latency = True 
     @staticmethod
     def keeptime():
         if Loop._i == Loop._num_calls - 1:
@@ -92,9 +93,8 @@ class Loop:
                 if sleep_for >= 0 or abs(sleep_for) < 1.5e-3:
                     if abs(sleep_for) < 1.5e-3:
                         sleep_for = 1e-3*Loop._latency
-                    time.sleep(sleep_for)
-                else:
-                    print(f"[+] no sleep: sleep_for: {sleep_for}ms")
+                    if Loop._manage_latency:
+                        time.sleep(sleep_for)
             else:
                 Loop._last = time.monotonic()
             for trigger, reset in Loop._triggers.values():
@@ -105,6 +105,11 @@ class Loop:
     @staticmethod
     def init():
         Loop._num_calls += 1
+
+    @staticmethod
+    def manage_latency(value):
+        assert isinstance(value, bool)
+        Loop._manage_latency = value
 
     @staticmethod
     def set_ms(ms, trigger):
