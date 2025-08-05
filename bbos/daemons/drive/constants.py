@@ -33,12 +33,12 @@ class odrive:
 # ----------------------------------------------------------------------
 
 
-@realtime(ms=20)
+@realtime(ms=30)
 def drive_ctrl():
     return [("twist", (np.float32, 2))]  # linear, angular
 
 
-@realtime(ms=20)
+@realtime(ms=30)
 def drive_state():
     return [("pos", (np.float32, 2)), ("vel", (np.float32, 2)),
             ("torque", (np.float32, 2))]

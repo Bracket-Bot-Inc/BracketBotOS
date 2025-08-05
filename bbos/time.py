@@ -37,7 +37,7 @@ def _get_lockfile(name):
 class TimeLog:
     def __init__(self, name):
         self._name = name
-        self._buf = MovingAverage(10)
+        self._buf = MovingAverage(100)
         self._f = os.open(_get_lockfile(name),
              os.O_WRONLY | os.O_CREAT | os.O_DSYNC,
              0o444)

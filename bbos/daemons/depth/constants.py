@@ -4,24 +4,32 @@ import numpy as np
 
 @register
 class depth:
-    block_size = 23
-    max_disp = 160  # in pixels
-    num_disp = 128  # in pixels
-    min_disp = -32
-    uniqueness = 7
-    speckle_w_size = 150
-    speckle_range = 1
-    prefilter_cap = 21
+    stride = 4         # Process every Nth frame to reduce CPU usage
+    downsample= 0.375   # 37.5 % resolution → faster and less noisy
+    window_size= 23   # StereoBM block size
+    min_disp= -32
+    num_disp= 128     # Must be multiple of 16
+    uniqueness=7
+    speckle_window= 150
+    speckle_range= 1
+    pre_filter_cap= 21
+    max_range= 8.0
+
+@register
+class points:
+    stride = 4         # Process every Nth frame to reduce CPU usage
+    max_range= 5.0
 
 
-@realtime(ms=60)
+@realtime(ms=80)
 def camera_depth(height, width):
     return [
+        ("rect", np.float64, (2, height, width, 3)),
         ("depth", np.uint16, (height, width)),
     ]
 
 
-@realtime(ms=60)
+@realtime(ms=80)
 def camera_points(height, width):
     return [
         ("points", np.float64, (height, width, 3)),

@@ -12,9 +12,9 @@ class stereo:
     height: int = 720  # stereo image height
     fov_diag = 180  # degrees
     r = np.sqrt((width / 2)**2 + height**2)
-    xfov = 147
+    xfov = 180
     yfov = 83
-    f_x = (width / 2) / (2 * np.tan(np.deg2rad(xfov) / 2))
+    f_x = 1500 
 
 
 @realtime(ms=60)
