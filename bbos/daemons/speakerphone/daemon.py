@@ -10,10 +10,8 @@ import numpy as np
 import sounddevice as sd
 import signal, sys, threading
 import re
-from cffi import FFI
-ffi = FFI()
+
 CFG = Config("speakerphone")
-#Loop.nonblock()
 
 def find_device_index(pattern, kind=None, flags=0):
     """
@@ -38,73 +36,26 @@ def find_device_index(pattern, kind=None, flags=0):
         print(f"  {i}: {d['name']}")
     return None
 
-# ── shared objects ───────────────────────────────────────────────────────
-mic_type  = Type("speakerphone_mic")
-zeros     = np.zeros((CFG.speaker_chunk_size, CFG.speaker_channels), np.int16)
+def main(w_mic, r_speak):
+    def mic_cb(indata, frames, time_info, status):
+        w_mic["audio"] = indata
+    # ── set up and run ───────────────────────────────────────────────────────
+    sd.check_input_settings(samplerate=CFG.mic_sample_rate,  channels=CFG.mic_channels,  dtype='int16')
+    sd.check_output_settings(samplerate=CFG.speaker_sample_rate, channels=CFG.speaker_channels, dtype='int16')
 
-r_speak = Reader("/audio.speaker")
-w_mic   = Writer("/audio.mic", mic_type)
-
-# Use a lock‑free queue if you prefer; here we share a NumPy view.
-spk_buf = np.empty_like(zeros)        # scratch for speaker data
-spk_lock = threading.Lock()           # protects spk_buf swap
-
-# Define the C struct layout
-ffi.cdef("""
-typedef struct {
-    double inputBufferAdcTime;
-    double currentTime;
-    double outputBufferDacTime;
-} PaStreamCallbackTimeInfo;
-""")
-
-def time_info_to_string(time_info_ptr):
-    ti = ffi.cast("PaStreamCallbackTimeInfo *", time_info_ptr)[0]
-    return f"{ti.currentTime},{ti.inputBufferAdcTime},{ti.outputBufferDacTime}\n"
-
-# ── callbacks ────────────────────────────────────────────────────────────
-def mic_cb(indata, frames, time_info, status):
-    if status:                           # XRuns etc.
-        print("⚠️", status, file=sys.stderr)
-    w_mic["audio"] = indata
-
-def spk_cb(outdata, frames, time_info, status):
-    if status:
-        print(status)
-    if r_speak.ready():
-        # /audio.speaker has exactly speaker_chunk_size frames
-        np.copyto(outdata, r_speak.data["audio"].copy())
-    else:
-        np.copyto(outdata, zeros)
-
-# ── set up and run ───────────────────────────────────────────────────────
-sd.check_input_settings(samplerate=CFG.mic_sample_rate,  channels=CFG.mic_channels,  dtype='int16')
-sd.check_output_settings(samplerate=CFG.speaker_sample_rate, channels=CFG.speaker_channels, dtype='int16')
-
-mic_stream = sd.InputStream(device     = CFG.mic_device,
-                            samplerate = CFG.mic_sample_rate,
-                            channels   = CFG.mic_channels,
-                            dtype      = 'int16',
-                            blocksize  = CFG.mic_chunk_size,
-                            callback   = mic_cb)
-
-spk_stream = sd.OutputStream(device     = CFG.speaker_device,
-                             samplerate = CFG.speaker_sample_rate,
-                             channels   = CFG.speaker_channels,
-                             dtype      = 'int16',
-                             blocksize  = CFG.speaker_chunk_size)
-
-def stop_all(*_):
-    mic_stream.abort(); spk_stream.abort()
-    mic_stream.close(); spk_stream.close()
-    r_speak.close(); w_mic.close()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT,  stop_all)
-signal.signal(signal.SIGTERM, stop_all)
-
-with w_mic, r_speak, mic_stream, spk_stream:
-    print("⇄  streaming – Ctrl‑C to quit")
+    mic_stream = sd.InputStream(device     = CFG.mic_device,
+                                samplerate = CFG.mic_sample_rate,
+                                channels   = CFG.mic_channels,
+                                dtype      = 'int16',
+                                blocksize  = CFG.mic_chunk_size,
+                                callback   = mic_cb)
+    spk_stream = sd.OutputStream(device     = CFG.speaker_device,
+                                samplerate = CFG.speaker_sample_rate,
+                                channels   = CFG.speaker_channels,
+                                dtype      = 'int16',
+                                blocksize  = CFG.speaker_chunk_size)
+    zeros = np.zeros((CFG.speaker_chunk_size, CFG.speaker_channels), np.int16)
+    mic_stream.start()
     spk_stream.start()
     while True:
         if r_speak.ready():
@@ -112,3 +63,14 @@ with w_mic, r_speak, mic_stream, spk_stream:
             spk_stream.write(data)
         if not r_speak.readable:
             spk_stream.write(zeros)
+    spk_stream.stop()
+    mic_stream.stop()
+    spk_stream.close()
+    mic_stream.close()
+
+if __name__ == "__main__":
+    mic_type  = Type("speakerphone_mic")
+    r_speak = Reader("/audio.speaker")
+    w_mic   = Writer("/audio.mic", mic_type)
+    with w_mic, r_speak:
+        main(w_mic, r_speak)

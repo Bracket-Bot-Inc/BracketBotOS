@@ -18,14 +18,18 @@ def main():
          Reader("/audio.mic") as r_mic,  \
          Reader("/led_strip.ctrl") as r_led,  \
          Reader("/audio.speaker") as r_speak, \
-         Reader("/camera.depth") as r_depth:
+         Reader("/camera.points") as r_pts:
         while True:
             if r_jpeg.ready():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
                 rr.log("/camera", rr.EncodedImage(contents=r_jpeg.data['jpeg'],media_type="image/jpeg"))
-            if r_depth.ready():
-                rr.set_time("monotonic", timestamp=r_depth.data['timestamp'])
-                rr.log("/depth", rr.DepthImage(r_depth.data['depth']))
+            #if r_depth.ready():
+                #rr.set_time("monotonic", timestamp=r_depth.data['timestamp'])
+                #rr.log("/depth", rr.DepthImage(r_depth.data['depth']))
+            if r_pts.ready():
+                rr.set_time("monotonic", timestamp=r_pts.data['timestamp'])
+                rr.log("/points", rr.Points3D(r_pts.data['points'][:r_pts.data['num_points']], 
+                                              colors=r_pts.data['colors'][:r_pts.data['num_points']]))
             if r_ctrl.ready():
                 for field in r_ctrl.data.dtype.names:
                     if field != 'timestamp':

@@ -71,11 +71,14 @@ def main():
 
     # Calculate correct dimensions based on downsampled stereo frame
     # The stereo frame contains both cameras side by side, so width needs to be halved
-    width_D, height_D = (int(CFG.width * CFG_D.downsample), int(CFG.height * CFG_D.downsample))
+    img_w = CFG.width // 2
+    width_D, height_D = (int(img_w * CFG_D.downsample), int(CFG.height * CFG_D.downsample))
+
+    num_pts = int(np.floor((width_D * height_D + CFG_P.stride - 1) / CFG_P.stride))
 
     with Reader('/camera.jpeg') as r_jpeg, \
             Writer('/camera.depth', lambda: Type("camera_depth")(height_D, width_D)) as w_depth, \
-            Writer('/camera.points', lambda: Type("camera_points")(height_D, width_D)) as w_points:
+            Writer('/camera.points', lambda: Type("camera_points")(num_pts)) as w_points:
         
         print(f"OpenCL available: {cv2.ocl.haveOpenCL()}")
         if cv2.ocl.haveOpenCL():
@@ -87,15 +90,15 @@ def main():
                 stereo = cv2.imdecode(r_jpeg.data["jpeg"], cv2.IMREAD_COLOR)
                 if stereo is None:
                     continue
-                left  = stereo[:, :CFG.width//2]
-                right = stereo[:, CFG.width//2:]
+                left  = stereo[:, :img_w]
+                right = stereo[:, img_w:]
                 baseline_m = abs(P2_cam[0, 3] / P2_cam[0, 0]) / 1000.0
                 fx_ds      = P1_cam[0, 0] * CFG_D.downsample
                 map1x, map1y = cv2.fisheye.initUndistortRectifyMap(
-                    mtx_l, dist_l, R1, P1_cam, (CFG.width, CFG.height), cv2.CV_32FC1
+                    mtx_l, dist_l, R1, P1_cam, (img_w, CFG.height), cv2.CV_32FC1
                 )
                 map2x, map2y = cv2.fisheye.initUndistortRectifyMap(
-                    mtx_r, dist_r, R2, P2_cam, (CFG.width, CFG.height), cv2.CV_32FC1
+                    mtx_r, dist_r, R2, P2_cam, (img_w, CFG.height), cv2.CV_32FC1
                 )
                 stereo = cv2.StereoBM_create(numDisparities=CFG_D.num_disp, blockSize=CFG_D.window_size)
                 stereo.setMinDisparity(CFG_D.min_disp)
@@ -117,16 +120,22 @@ def main():
                 # Ensure type checker knows these are initialised
                 assert fx_ds is not None and baseline_m is not None, "Stereo parameters not initialised"
                 depth_m[mask] = fx_ds * baseline_m / denom[mask]
-
                 # Encode depth to 16-bit PNG (millimetres – preserves precision)
                 depth_mm = np.clip(depth_m * 1000.0, 0, 65535).astype(np.uint16)
-                #pts_cam, cols = disparity_to_camera_points(disp, Q, left_ds)
+                pts_cam, cols = disparity_to_camera_points(disp, Q, left_ds)
 
                 with w_depth.buf() as b:
                     b['rect'][0] = left_ds
                     b['rect'][1] = right_ds
                     b['depth'] = depth_mm.reshape((height_D, width_D))
                     b['timestamp'] = r_jpeg.data['timestamp']
+
+                with w_points.buf() as b:
+                    b['num_points'] = len(pts_cam)
+                    b['points'][:len(pts_cam)] = pts_cam
+                    b['colors'][:len(cols)] = cols
+                    b['timestamp'] = r_jpeg.data['timestamp']
+
 
 if __name__ == "__main__":
     main()
