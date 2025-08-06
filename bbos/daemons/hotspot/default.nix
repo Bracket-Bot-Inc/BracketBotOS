@@ -120,7 +120,6 @@ create_virtual_interface
 bring_up_interface
 configure_hotspot
 configure_ssh
-restart_avahi
 
 echo "Access Point Setup script finished."  
 
