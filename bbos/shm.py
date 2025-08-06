@@ -41,7 +41,7 @@ def json_descr_to_dtype(desc):
 
 
 class Writer:
-    def __init__(self, name, datatype: Type | List[tuple]):
+    def __init__(self, name, datatype: Type | List[tuple], keeptime=True):
         shmtype, latency = datatype if isinstance(datatype, tuple) else datatype()
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
@@ -55,10 +55,12 @@ class Writer:
             raise RuntimeError(
                 f"Writer for '{name}' exists, {self._lockfile})")
 
-        # set loop trigger
-        Loop.init()
-        self._trigger = [0] # mutable counter
-        Loop.set_ms(latency, self._trigger)
+        self._keeptime = keeptime
+        if keeptime:
+            # set loop trigger
+            Loop.init()
+            self._trigger = [0] # mutable counter
+            Loop.set_ms(latency, self._trigger)
 
         # create shared memory
         self._shm = posix_ipc.SharedMemory(
@@ -78,8 +80,11 @@ class Writer:
     def __enter__(self):
         return self
 
-    def _update(self): 
-        return self._trigger[0] == 0
+    def _update(self):
+        if self._keeptime:
+            return self._trigger[0] == 0
+        else:
+            return True
 
     @contextlib.contextmanager
     def buf(self):
@@ -89,7 +94,8 @@ class Writer:
             yield self._buf[0] if self._update() else np.zeros_like(self._buf[0])
         finally:
             self._seq.value += 1  # mark as published (even)
-        Loop.keeptime()
+        if self._keeptime:
+            Loop.keeptime()
 
     def __setitem__(self, idx, data):
         if self._update():
@@ -97,7 +103,8 @@ class Writer:
             self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
             self._buf[0][idx] = data
             self._seq.value += 1  # even → publish
-        Loop.keeptime()
+        if self._keeptime:
+            Loop.keeptime()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
@@ -109,17 +116,18 @@ class Writer:
 
 
 class Reader:
-    def __init__(self, name, realtime=False):
+    def __init__(self, name, keeptime=False):
         self._name = name
-        self._realtime = realtime
         self._lockfile = _get_lockfile(name)
         self._lock_fd = None
         self._readable = False
         self._valid = False
         self._tlog = TimeLog(name)
         self._data = None
-        self._trigger = [0] # mutable counter
-        Loop.init()
+        self._keeptime = keeptime
+        if keeptime:
+            self._trigger = [0] # mutable counter
+            Loop.init()
 
     def __enter__(self):
         return self
@@ -127,7 +135,8 @@ class Reader:
     def ready(self):
         if not os.path.exists(self._lockfile):
             self._readable = False
-            Loop.keeptime()
+            if self._keeptime:
+                Loop.keeptime()
             return self._readable
         # wait until the writer has created the lock-file
         if not self._readable:
@@ -135,11 +144,13 @@ class Reader:
                 with open(self._lockfile, 'r') as f:
                     lock = json.load(f)
                     shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
-                    self._trigger[0] = 0
-                    Loop.set_ms(lock["latency"], self._trigger)
+                    if self._keeptime:
+                        self._trigger[0] = 0
+                        Loop.set_ms(lock["latency"], self._trigger)
             except:
                 self._readable = False
-                Loop.keeptime()
+                if self._keeptime:
+                    Loop.keeptime()
                 return self._readable
             self._readable = True
             size = shmdtype.itemsize + CACHE_LINE
@@ -157,7 +168,8 @@ class Reader:
         self._data = data
         if not stale:
             self._tlog.log()
-        Loop.keeptime()
+        if self._keeptime:
+            Loop.keeptime()
         return not stale
 
     def _read(self):

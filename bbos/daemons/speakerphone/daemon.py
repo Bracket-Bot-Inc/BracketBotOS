@@ -23,15 +23,17 @@ def find_device_index(pattern, kind=None, flags=0):
     :return: Device index or None if not found.
     """
     for i, d in enumerate(sd.query_devices()):
+        print(f"Device {i}: {d['name']}", flush=True)
         if not re.search(pattern, d["name"], flags=flags | re.IGNORECASE):
             continue
         if kind == "input" and d["max_input_channels"] == 0:
             continue
         if kind == "output" and d["max_output_channels"] == 0:
             continue
+        print(f"Found device: {d['name']}", flush=True)
         return i
-    print(f"No device found matching pattern: {pattern}")
-    print("Available devices:")
+    print(f"No device found matching pattern: {pattern}", flush=True)
+    print("Available devices:", flush=True)
     for i, d in enumerate(sd.query_devices()):
         print(f"  {i}: {d['name']}")
     return None
@@ -43,13 +45,13 @@ def main(w_mic, r_speak):
     sd.check_input_settings(samplerate=CFG.mic_sample_rate,  channels=CFG.mic_channels,  dtype='int16')
     sd.check_output_settings(samplerate=CFG.speaker_sample_rate, channels=CFG.speaker_channels, dtype='int16')
 
-    mic_stream = sd.InputStream(device     = CFG.mic_device,
+    mic_stream = sd.InputStream(device     = find_device_index(CFG.mic_device),
                                 samplerate = CFG.mic_sample_rate,
                                 channels   = CFG.mic_channels,
                                 dtype      = 'int16',
                                 blocksize  = CFG.mic_chunk_size,
                                 callback   = mic_cb)
-    spk_stream = sd.OutputStream(device     = CFG.speaker_device,
+    spk_stream = sd.OutputStream(device     = find_device_index(CFG.speaker_device),
                                 samplerate = CFG.speaker_sample_rate,
                                 channels   = CFG.speaker_channels,
                                 dtype      = 'int16',
@@ -71,6 +73,6 @@ def main(w_mic, r_speak):
 if __name__ == "__main__":
     mic_type  = Type("speakerphone_mic")
     r_speak = Reader("/audio.speaker")
-    w_mic   = Writer("/audio.mic", mic_type)
+    w_mic   = Writer("/audio.mic", mic_type, keeptime=False)
     with w_mic, r_speak:
         main(w_mic, r_speak)

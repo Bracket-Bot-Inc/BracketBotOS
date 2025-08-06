@@ -5,6 +5,7 @@
 #   "aiortc",
 #   "av",
 #   "dotenv",
+#   "scipy",
 #   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
@@ -74,8 +75,6 @@ class Speaker:
             
             # Check what OpenAI actually reports
             frame_sample_rate = getattr(frame, 'sample_rate', 48000)
-            #print(f"Frame reports {frame_sample_rate}Hz, time_base={getattr(frame, 'time_base', 'none')}")
-            #print(f"Resampling {len(audio_data)} samples from {frame_sample_rate}Hz to {CFG.speaker_sample_rate}Hz")
             
             if CFG.speaker_sample_rate != frame_sample_rate:
                 resampled = signal.resample_poly(audio_data.astype(np.float32), 
@@ -201,7 +200,14 @@ class WebRTCManager:
                     "voice": "shimmer",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
-                    "turn_detection": {"type": "semantic_vad", "eagerness": "low"}
+                    "turn_detection": {
+                        "type": "server_vad",
+                        "threshold": 0.5,
+                        "prefix_padding_ms": 300,
+                        "silence_duration_ms": 500,
+                        "create_response": True,
+                        "interrupt_response": False,
+                    }
                 }
             }
             self.data_channel.send(json.dumps(session_update))

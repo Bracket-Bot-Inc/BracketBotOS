@@ -9,8 +9,8 @@ import numpy as np
 # ----------------------------------------------------------------------
 @register
 class speakerphone:
-    speaker_device = "Respeaker Lite"
-    mic_device = "Respeaker Lite"
+    speaker_device = "ReSpeaker Lite"
+    mic_device = "ReSpeaker Lite"
     speaker_sample_rate: int = 16_000
     speaker_channels: int = 1
     mic_sample_rate: int = 16_000

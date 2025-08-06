@@ -8,6 +8,9 @@ pkgs.mkShell {
     python311.pkgs.pip
     python311Packages.numpy
     python311Packages.sounddevice
+    python311Packages.pyaudio
+    alsa-utils
+    alsa-lib 
     portaudio
     zlib
     libGL
@@ -29,7 +32,6 @@ pkgs.mkShell {
       python -m venv venv
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
-      pip install sounddevice numpy
       pip install -e ../../..
 
       amixer -c2 --quiet sset "PCM" 100% unmute

@@ -13,11 +13,11 @@ import sounddevice as sd
 
 # ── user settings ───────────────────────────────────────────────────────
 FILE_NAME    = "recording_cb.wav"
-DURATION     = 5            # seconds
+DURATION     = 100            # seconds
 SAMPLE_RATE  = 16_000       # Hz
 CHANNELS     = 1            # whatever works for your device
 BLOCK_FRAMES = 1024         # same as pull version
-DEVICE       = None         # None = default; or an index / "hw:…"
+DEVICE       =  2         # None = default; or an index / "hw:…"
 # ────────────────────────────────────────────────────────────────────────
 
 # Sanity‑check the device with the desired channel count
