@@ -55,66 +55,6 @@ configure_ssh() {
         sudo systemctl restart ssh || echo "Failed: restart ssh"
     fi
 }
-restart_avahi() {
-    echo "Configuring avahi-daemon …"
-    local AVAHI_CONF="/etc/avahi/avahi-daemon.conf"
-
-    if [ -f "$AVAHI_CONF" ]; then
-        # ----- allow-interfaces -----
-        if grep -qE '^[[:space:]]*#?[[:space:]]*allow-interfaces=' "$AVAHI_CONF"; then
-            sudo sed -i 's|^[[:space:]]*#\?allow-interfaces=.*|allow-interfaces=wlan0,wlan0-ap,eth0|' "$AVAHI_CONF"
-        else
-            sudo sed -i '/^\[server\]/a allow-interfaces=wlan0,wlan0-ap,eth0' "$AVAHI_CONF"
-        fi
-
-        # ----- publish-workstation -----
-        if grep -qE '^[[:space:]]*#?[[:space:]]*publish-workstation=' "$AVAHI_CONF"; then
-            sudo sed -i 's|^[[:space:]]*#\?publish-workstation=.*|publish-workstation=yes|' "$AVAHI_CONF"
-        else
-            sudo sed -i '/^\[server\]/a publish-workstation=yes' "$AVAHI_CONF"
-        fi
-
-        # ----- publish-addresses -----
-        if grep -qE '^[[:space:]]*#?[[:space:]]*publish-addresses=' "$AVAHI_CONF"; then
-            sudo sed -i 's|^[[:space:]]*#\?publish-addresses=.*|publish-addresses=yes|' "$AVAHI_CONF"
-        else
-            sudo sed -i '/^\[server\]/a publish-addresses=yes' "$AVAHI_CONF"
-        fi
-
-        # ----- publish-hinfo -----
-        if grep -qE '^[[:space:]]*#?[[:space:]]*publish-hinfo=' "$AVAHI_CONF"; then
-            sudo sed -i 's|^[[:space:]]*#\?publish-hinfo=.*|publish-hinfo=yes|' "$AVAHI_CONF"
-        else
-            sudo sed -i '/^\[server\]/a publish-hinfo=yes' "$AVAHI_CONF"
-        fi
-    else
-        echo "Creating $AVAHI_CONF …"
-        sudo tee "$AVAHI_CONF" >/dev/null <<EOF
-[server]
-allow-interfaces=wlan0,wlan0-ap,eth0
-publish-workstation=yes
-publish-hinfo=yes
-EOF
-fi
-
-    local HOTSPOT_CN="Hotspot"               # change if you named it differently
-    if nmcli -t -f NAME,TYPE connection show | grep -q "^${HOTSPOT_CN}:wifi"; then
-        local CURRENT_MDNS
-        CURRENT_MDNS=$(nmcli -g connection.mdns connection show "$HOTSPOT_CN")
-        if [ "$CURRENT_MDNS" != "yes" ] && [ "$CURRENT_MDNS" != "2" ]; then
-            echo "Enabling mDNS on NM connection '$HOTSPOT_CN' …"
-            sudo nmcli connection modify "$HOTSPOT_CN" connection.mdns yes
-            # Cycle the connection so new nft/iptables rules take effect
-            sudo nmcli connection down "$HOTSPOT_CN" || true
-            sudo nmcli connection up   "$HOTSPOT_CN"
-        fi
-    else
-        echo "Warning: NetworkManager connection '$HOTSPOT_CN' not found; skip mdns tweak."
-    fi
-
-    echo "Restarting avahi-daemon …"
-    sudo systemctl restart avahi-daemon || echo "Failed to restart avahi-daemon"
-}
 
 create_virtual_interface
 bring_up_interface
