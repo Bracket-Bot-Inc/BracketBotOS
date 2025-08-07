@@ -68,6 +68,7 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
       pip install -e ../../..
+      pip install pyyaml
     else
       source venv/bin/activate
       
