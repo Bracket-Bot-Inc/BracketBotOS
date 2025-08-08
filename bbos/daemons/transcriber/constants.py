@@ -7,8 +7,9 @@ import numpy as np
 # ----------------------------------------------------------------------
 @register
 class transcriber:
-    chunk_ms: int = 4000 # ms
+    chunk_ms: int = 1000 # ms
     sequence_length: int = 167 # upper bound of spoken characters within 2s window
+    context_chunk_count: int = 4
 
 
 # ----------------------------------------------------------------------

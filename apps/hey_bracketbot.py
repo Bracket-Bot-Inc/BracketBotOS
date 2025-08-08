@@ -1,4 +1,3 @@
-# AUTO
 # /// script
 # dependencies = [
 #   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
@@ -59,17 +58,16 @@ def main():
         detected = False
         while True:
             if r_transcript.ready():
-                print(r_transcript.data['timestamp'])
+                print(r_transcript.data)
                 text = r_transcript.data['text']
                 if detect_wake_word(text):
                     detected = True
                     print("DETECTED")
                 else:
                     detected = False
+            rgb_array.fill(0)
             if detected:
                 rgb_array[:, 1] = 255
-            else:
-                rgb_array[:, 1] = 0
             w_led_strip["rgb"] = rgb_array
 
 if __name__ == "__main__":

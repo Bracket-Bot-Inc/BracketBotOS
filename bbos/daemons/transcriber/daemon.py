@@ -30,7 +30,7 @@ def infer_worker(model, in_q, out_q):
         out_q.put(txt)
 
 def main(r_mic, w_text):
-    model = Transcriber(device=-1, chunk_duration=CFG_TRNS.chunk_ms/1e3)
+    model = Transcriber(device=-1, chunk_duration=CFG_TRNS.chunk_ms/1e3, context_chunk_count=CFG_TRNS.context_chunk_count)
     buffer = Buffer((CFG_TRNS.chunk_ms // CFG_SPKPN.mic_ms, CFG_SPKPN.mic_chunk_size))
     in_q  = queue.Queue(maxsize=3)
     out_q = queue.Queue(maxsize=4)
