@@ -1,5 +1,5 @@
 from bbos import register, realtime
-from bbos.os_utils import Priority
+
 
 import numpy as np
 

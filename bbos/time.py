@@ -103,8 +103,9 @@ class Loop:
             Loop._i += 1
     
     @staticmethod
-    def init():
+    def init(trigger):
         Loop._num_calls += 1
+        Loop._triggers[hex(id(trigger))] = [trigger,1]
 
     @staticmethod
     def manage_latency(value):
@@ -116,11 +117,17 @@ class Loop:
         assert ms > 0 and isinstance(ms, int)
         if not ms in Loop._requested_ms:
             Loop._requested_ms.add(ms)
-            Loop._latency = math.gcd(*Loop._requested_ms)
-        if not hex(id(trigger)) in Loop._triggers:
-            Loop._triggers[hex(id(trigger))] = ([trigger, int(ms / Loop._latency)])
-            print(f"[+] Loop._latency: {Loop._latency}ms")
-            print(Loop._triggers)
+            print(Loop._requested_ms)
+            new_latency = math.gcd(*Loop._requested_ms)
+            if len(Loop._requested_ms) != 1 and new_latency != Loop._latency:
+                multiplier = Loop._latency // new_latency
+                for t in Loop._triggers:
+                    Loop._triggers[t][1] *= multiplier
+                print(f"[+] Changed Loop._latency from {Loop._latency}ms to {new_latency}ms")
+            Loop._latency = new_latency
+        Loop._triggers[hex(id(trigger))] = [trigger, int(ms / Loop._latency)]
+        print(f"[+] Loop._latency: {Loop._latency}ms")
+        print(Loop._triggers)
 
 class Realtime:
     pri = 20

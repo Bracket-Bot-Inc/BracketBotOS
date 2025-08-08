@@ -58,8 +58,8 @@ class Writer:
         self._keeptime = keeptime
         if keeptime:
             # set loop trigger
-            Loop.init()
             self._trigger = [0] # mutable counter
+            Loop.init(self._trigger)
             Loop.set_ms(latency, self._trigger)
 
         # create shared memory
@@ -90,7 +90,8 @@ class Writer:
     def buf(self):
         self._seq.value += 1  # mark as dirty (odd)
         try:
-            self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
+            if self._update():
+                self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
             yield self._buf[0] if self._update() else np.zeros_like(self._buf[0])
         finally:
             self._seq.value += 1  # mark as published (even)
@@ -116,7 +117,7 @@ class Writer:
 
 
 class Reader:
-    def __init__(self, name, keeptime=False):
+    def __init__(self, name, keeptime=True):
         self._name = name
         self._lockfile = _get_lockfile(name)
         self._lock_fd = None
@@ -126,11 +127,19 @@ class Reader:
         self._data = None
         self._keeptime = keeptime
         if keeptime:
+            print("READER trigger")
             self._trigger = [0] # mutable counter
-            Loop.init()
+            Loop.init(self._trigger)
 
     def __enter__(self):
         return self
+
+
+    def _update(self):
+        if self._keeptime:
+            return self._trigger[0] == 0
+        else:
+            return True
 
     def ready(self):
         if not os.path.exists(self._lockfile):

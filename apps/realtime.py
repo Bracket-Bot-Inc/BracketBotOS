@@ -197,17 +197,7 @@ class WebRTCManager:
                 "session": {
                     "modalities": ["audio"],
                     "instructions": self.system_prompt,
-                    "voice": "shimmer",
-                    "input_audio_format": "pcm16",
-                    "output_audio_format": "pcm16",
-                    "turn_detection": {
-                        "type": "server_vad",
-                        "threshold": 0.5,
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 500,
-                        "create_response": True,
-                        "interrupt_response": False,
-                    }
+
                 }
             }
             self.data_channel.send(json.dumps(session_update))
@@ -218,7 +208,11 @@ class WebRTCManager:
                 "type": "response.create",
                 "response": {
                     "modalities": ["audio"],
-                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering."
+                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.",
+                    "voice": "shimmer",
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "turn_detection": None
                 }
             }
             self.data_channel.send(json.dumps(response_create))
@@ -228,7 +222,13 @@ class WebRTCManager:
 
     async def _get_ephemeral_token(self):
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {"model": self.model, "voice": "alloy"}
+        payload = {"model": self.model, "voice": "alloy",
+                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.",
+                    "voice": "shimmer",
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "turn_detection": None
+        }
         if self.system_prompt:
             payload["instructions"] = self.system_prompt
 

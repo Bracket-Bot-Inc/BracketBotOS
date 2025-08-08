@@ -1,5 +1,4 @@
 from bbos import register, realtime
-from bbos.os_utils import Priority
 
 import numpy as np
 
@@ -16,9 +15,9 @@ class speakerphone:
     mic_sample_rate: int = 16_000
     mic_channels: int = 1
     speaker_ms: int = 50
-    mic_ms: int = 50
+    mic_ms: int = 100
     speaker_chunk_size: int = speaker_sample_rate // 1000 * speaker_ms
-    mic_chunk_size: int = mic_sample_rate // 1000 * mic_ms * 2
+    mic_chunk_size: int = mic_sample_rate // 1000 * mic_ms
 
 
 # ----------------------------------------------------------------------

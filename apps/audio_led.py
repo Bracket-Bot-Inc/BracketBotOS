@@ -6,7 +6,7 @@
 import numpy as np
 from bbos import Writer, Reader, Type, Config
 from bbos.time import Realtime
-from bbos.os_utils import Priority
+
 
 CFG_LED = Config("led_strip")
 CFG_AUDIO = Config("speakerphone")

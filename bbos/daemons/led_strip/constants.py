@@ -1,5 +1,5 @@
 from bbos.registry import *
-from bbos.os_utils import Priority
+
 
 import numpy as np
 
