@@ -191,8 +191,8 @@ if __name__ == "__main__":
     import sys
     auto_mode = len(sys.argv) > 1 and sys.argv[1] == "demo"
     
-    with Writer("/audio.speaker", Type("speakerphone_speaker")) as w_audio, \
-         Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led:
+    with Writer("audio.speaker", Type("speakerphone_speaker")) as w_audio, \
+         Writer("led_strip.ctrl", Type("led_strip_ctrl")) as w_led:
         
         if auto_mode:
             print("[Whistle] Running in demo mode...")

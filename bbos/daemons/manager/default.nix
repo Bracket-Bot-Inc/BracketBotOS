@@ -129,10 +129,10 @@ clean = pkgs.writeShellApplication {
   text = ''
     set -eu
     sudo systemctl kill -s SIGKILL manager
-    sudo systemctl kill -s SIGKILL autostart
+    sudo systemctl kill -s SIGKILL app_manager
     find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
     sudo systemctl restart manager
-    sudo systemctl restart autostart
+    sudo systemctl restart app_manager
     echo "Clean Slate!"
   '';
 };
@@ -142,10 +142,10 @@ restart = pkgs.writeShellApplication {
   text = ''
     set -eu
     sudo systemctl kill -s SIGKILL manager
-    sudo systemctl kill -s SIGKILL autostart
+    sudo systemctl kill -s SIGKILL app_manager
     find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
     sudo systemctl restart manager
-    sudo systemctl restart autostart
+    sudo systemctl restart app_manager
     echo "Restarted!"
   '';
 };
@@ -156,7 +156,7 @@ stop = pkgs.writeShellApplication {
     set -eu
     if [ "$#" -eq 0 ]; then
       sudo systemctl kill -s SIGKILL manager
-      sudo systemctl kill -s SIGKILL autostart
+      sudo systemctl kill -s SIGKILL app_manager
       find /tmp -maxdepth 1 \( -name '*_lock' -o -name '*.log' \) -exec rm -f {} +
       echo "Stopped!"
     else

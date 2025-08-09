@@ -19,6 +19,35 @@ def get_owned_locks(name):
 
 def get_lock_path(app): return Path(f"/tmp/app-{app}_lock")
 
+def stop_app(app):
+    lock = get_lock_path(app)
+    if lock.exists():
+        lock.unlink()
+    else:
+        print(f"[app-manager] {app} is not running!")
+        return False
+    return True
+
+def start_app(name):
+    lock = get_lock_path(name)
+    if lock.exists():
+        print(f"[app-manager] {name} is already running!")
+        return False
+    else:
+        lock.touch()
+    return True
+
+def get_status(exclude: List[str] = []) -> Dict:
+    """Get complete status of all apps and lock files"""
+    with open(f"/tmp/app-manager_lock", "r") as fd:
+        app_paths = json.load(fd)
+    app_status = {}
+    for app in app_paths:
+        if app in exclude:
+            continue
+        app_status[app] = get_lock_path(app).exists()
+    return app_status
+
 class AppManager:
     def __init__(self, app_dirs: List[Path] | Path):
         self.app_dirs = app_dirs if isinstance(app_dirs, list) else [app_dirs]
@@ -26,16 +55,29 @@ class AppManager:
         self.processes: Dict[str, Process] = {}
         self.last_start: Dict[str, float] = {}
         self.app_paths: Dict[str, Path] = {}
+        self.autostart: List[str] = []
         self.get_available_apps()
 
     def get_available_apps(self) -> List[str]:
         """Get list of available apps from APPS_PATH"""
+        def is_autostart(file: Path) -> bool:
+            for i, line in enumerate(file.read_text().splitlines()):
+                if i > 3:  # Only check first 10 lines
+                    break
+                line_stripped = line.strip()
+                if line_stripped.startswith("#AUTO") or line_stripped.startswith("# AUTO"):
+                    print(f"[autostart] Found autostart app: {file.parent.name}/{file.stem}") 
+                    return True
+            else:
+                return False
         apps = []
         for app_dir in self.app_dirs:
             # Check for .py files
             for app_file in app_dir.glob("*.py"):
                 apps.append(app_file.stem)
                 self.app_paths[app_file.stem] = app_file.absolute()
+                if is_autostart(app_file):
+                    self.autostart.append(app_file.stem)
             
             # Check for folders with main.py
             for folder in app_dir.iterdir():
@@ -44,11 +86,14 @@ class AppManager:
                     if main_file.exists():
                         apps.append(folder.name)
                         self.app_paths[folder.name] = main_file.absolute()
+                        if is_autostart(main_file):
+                            self.autostart.append(folder.name)
+        with open(f"/tmp/app-manager_lock", "w") as fd:
+            json.dump({k: str(v.absolute()) for k, v in self.app_paths.items()}, fd)
         return apps
     
     def is_app_running(self, app: str) -> bool:
-        lock = get_lock_path(app)
-        return (app in self.processes and self.processes[app].is_alive()) or (app not in self.processes and lock.exists())
+        return app in self.processes and self.processes[app].is_alive()
 
    # ── dashboard/launch side ─────────────────────────────────────────────
     def _launch_app(self, app):
@@ -64,34 +109,19 @@ class AppManager:
             os.execvp("uv", ["uv", "run", str(self.app_paths[app])])
 
     # ── dashboard/stop side ───────────────────────────────────────────────
-    def stop_app(self, app, timeout=PROCESS_STOP_TIMEOUT):
+    def _stop_app(self, app, timeout=PROCESS_STOP_TIMEOUT):
         if self.is_app_running(app):
             if app in self.processes:
                 p = self.processes[app]
                 os.killpg(p.pid, signal.SIGINT)                 # ② INT the whole group
                 p.join(timeout)
                 if p.is_alive():
-                    for lock in get_owned_locks(app):
-                        os.remove(lock)
                     p.terminate(); p.join(2)                    # escalate → TERM/KILL
                 del self.processes[app]
-        get_lock_path(app).unlink(missing_ok=True) # will trigger stop if running in another app manager
         return True
 
-    def _write_lock(self, app: str):
-        lock = get_lock_path(app)
-        if not lock.exists():
-            lock.touch()
-        else:
-            print(f"[app-manager] {app} is already running!")
-            return False
-        return True
 
-    def _read_lock(self, app: str):
-        lock = get_lock_path(app)
-        return lock.exists()
-
-    def start_app(self, app_name: str) -> bool:
+    def _start_app(self, app_name: str) -> bool:
         """Start an app"""
         if self.is_app_running(app_name):
             return False  # Already running
@@ -106,7 +136,6 @@ class AppManager:
                               name=app_name)
             print(f"[dashboard] Starting ")
             proc.start()
-            self._write_lock(app_name)
             self.processes[app_name] = proc
             self.last_start[app_name] = time.time()
             print(f"[dashboard] Started app: {app_name} (pid={proc.pid})")
@@ -116,56 +145,28 @@ class AppManager:
             print(f"[dashboard] Failed to start {app_name}: {e}")
             return False
     
-    def get_lock_files_status(self) -> Dict[str, bool]:
-        """Get status of lock files in /tmp/*_lock"""
-        lock_files = {}
-        tmp_path = Path("/tmp")
-        
-        for lock_file in tmp_path.glob("*_lock"):
-            name = lock_file.name[:-5]  # Remove '_lock' suffix
-            lock_files[name] = lock_file.exists()
-        
-        return lock_files
-    
-    def get_app_logs(self, app: str) -> str:
-        log_file = Path(f"/tmp/app-{app}.log")
-        owned_locks = get_owned_locks(app)
-        output = ""
-        for log in owned_locks.replace('_lock', '.log'):
-            if log.exists():
-                with open(log, "r") as f:
-                    output += f.read()
-        if not log_file.exists():
-            return output
-        with open(log_file, "r") as f:
-            output += f.read()
-        return output
-    
-    def get_status(self, exclude: List[str] = []) -> Dict:
-        """Get complete status of all apps and lock files"""
-        apps = self.get_available_apps()
-        app_status = {}
-        
-        for app in apps:
-            if app in exclude:
-                continue
-            if not get_lock_path(app).exists() and app in self.processes:
-                print(f"[app-manager] Detected external delete of {app}_lock. Terminating.")
-                self.stop_app(app)
-            app_status[app] = {
-                "running": self.is_app_running(app),
-                "pid": self.processes[app].pid if app in self.processes and self.processes[app].is_alive() else None
-            }
-        
-        return {
-            "apps": app_status,
-            "locks": self.get_lock_files_status()
-        }
+    def start(self):
+        for app in self.autostart:
+            print(f"[app-manager] Starting autostart app: {app}")
+            if not start_app(app):
+                print(f"[app-manager] Failed to start autostart app: {app}")
+        try:
+            while True:
+                for app in self.get_available_apps():
+                    if not get_lock_path(app).exists() and app in self.processes:
+                        print(f"[app-manager] Detected external delete of {app}_lock. Terminating.")
+                        self._stop_app(app)
+                    if get_lock_path(app).exists() and app not in self.processes:
+                        print(f"[app-manager] Detected external creation of {app}_lock. Starting.")
+                        self._start_app(app)
+                    time.sleep(0.05)
+        except KeyboardInterrupt:
+            self.stop_all()
 
-    def stop_all_apps(self):
+    def stop_all(self):
         while self.processes:
             app = next(iter(self.processes))
             self.stop_app(app)
     
     def __del__(self):
-        self.stop_all_apps()
+        self.stop_all()

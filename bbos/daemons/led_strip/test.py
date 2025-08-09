@@ -13,7 +13,7 @@ RAINBOW = [
 
 if __name__ == "__main__":
     CFG = Config("led_strip")
-    with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_ctrl:
+    with Writer("led_strip.ctrl", Type("led_strip_ctrl")) as w_ctrl:
         while True:
             for color in RAINBOW:
                 w_ctrl["rgb"] = np.array([color] * CFG.num_leds, dtype=np.uint8)

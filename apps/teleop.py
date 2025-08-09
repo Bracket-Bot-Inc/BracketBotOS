@@ -7,7 +7,6 @@
 # ]
 # ///
 from bbos import Reader, Writer, Type
-from bbos.paths import KEY_PTH, CERT_PTH
 
 import signal, json, numpy as np
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -174,14 +173,12 @@ def run(w_ctrl, r_cam, port=8000):
         port=port,
         ws="wsproto",
         log_level="info",
-        ssl_keyfile=str(KEY_PTH),
-        ssl_certfile=str(CERT_PTH),
     )
 
 
 def main():
-    with Writer('/drive.ctrl', Type("drive_ctrl")) as w_ctrl, \
-         Reader('/camera.jpeg') as r_cam:
+    with Writer('drive.ctrl', Type("drive_ctrl")) as w_ctrl, \
+         Reader('camera.jpeg') as r_cam:
         run(w_ctrl, r_cam)
 
 if __name__ == "__main__":

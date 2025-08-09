@@ -47,7 +47,7 @@ def main():
     
     try:
         # Initialize the drive control writer
-        with Writer("/drive.ctrl", Type("drive_ctrl")) as drive_writer:
+        with Writer("drive.ctrl", Type("drive_ctrl")) as drive_writer:
             writer = drive_writer
             
             print("BracketBotOS WASD Robot Control + Camera Capture")

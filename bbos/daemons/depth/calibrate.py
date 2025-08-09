@@ -1157,7 +1157,7 @@ def main():
         
         # Start camera capture thread
         def capture_loop():
-            with Reader("/camera.jpeg") as r_jpeg: 
+            with Reader("camera.jpeg") as r_jpeg: 
                 while True:
                     if r_jpeg.ready():
                         frame = cv2.imdecode(r_jpeg.data['jpeg'], cv2.IMREAD_COLOR)

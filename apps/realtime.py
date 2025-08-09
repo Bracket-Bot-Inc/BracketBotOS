@@ -252,8 +252,8 @@ async def main():
         print("OPENAI_API_KEY missing in environment")
         return
 
-    with Reader("/audio.mic") as r_mic, \
-        Writer("/audio.speaker", Type("speakerphone_speaker")) as w_speaker:
+    with Reader("audio.mic") as r_mic, \
+        Writer("audio.speaker", Type("speakerphone_speaker")) as w_speaker:
 
         mic = Mic(reader=r_mic)
         speaker = Speaker(writer=w_speaker)

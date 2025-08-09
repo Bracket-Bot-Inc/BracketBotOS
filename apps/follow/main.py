@@ -45,8 +45,8 @@ def main():
     cmd = np.zeros(2)
     CFG = Config("stereo")
     img_width = CFG.width // 2
-    with Reader("/camera.jpeg") as r_jpeg, \
-        Writer("/drive.ctrl", Type("drive_ctrl")) as w_ctrl:
+    with Reader("camera.jpeg") as r_jpeg, \
+        Writer("drive.ctrl", Type("drive_ctrl")) as w_ctrl:
 
         while True:
             loop_start = time.time()

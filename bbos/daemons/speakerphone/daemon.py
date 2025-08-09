@@ -72,7 +72,7 @@ def main(w_mic, r_speak):
 
 if __name__ == "__main__":
     mic_type  = Type("speakerphone_mic")
-    r_speak = Reader("/audio.speaker")
-    w_mic   = Writer("/audio.mic", mic_type, keeptime=False)
+    r_speak = Reader("audio.speaker")
+    w_mic   = Writer("audio.mic", mic_type, keeptime=False)
     with w_mic, r_speak:
         main(w_mic, r_speak)

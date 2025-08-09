@@ -29,7 +29,7 @@ def main():
 
     session_id = int(time.time())
     
-    with Reader("/camera.jpeg") as r_jpeg:
+    with Reader("camera.jpeg") as r_jpeg:
         while True:
             if r_jpeg.ready():
                 # Extract JPEG data 

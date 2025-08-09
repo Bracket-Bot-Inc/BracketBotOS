@@ -52,8 +52,8 @@ def detect_wake_word(text):
     return max_score > 0.7
 
 def main():
-    with Reader("/transcript") as r_transcript, \
-         Writer("/led_strip.ctrl", Type('led_strip_ctrl')) as w_led_strip:
+    with Reader("transcript") as r_transcript, \
+         Writer("led_strip.ctrl", Type('led_strip_ctrl')) as w_led_strip:
         rgb_array = np.zeros((CFG_LED_STRIP.num_leds,3), dtype=np.uint8)
         detected = False
         while True:

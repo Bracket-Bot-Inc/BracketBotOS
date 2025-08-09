@@ -11,14 +11,14 @@ def main():
     server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="500MB")
     rr.serve_web_viewer(web_port=9090, connect_to=server_uri, open_browser=False)
     rr.set_time("monotonic", timestamp=time.monotonic())
-    with Reader("/camera.jpeg") as r_jpeg,  \
-         Reader("/drive.ctrl") as r_ctrl,   \
-         Reader("/drive.state") as r_state, \
-         Reader("/drive.status") as r_status, \
-         Reader("/audio.mic") as r_mic,  \
-         Reader("/led_strip.ctrl") as r_led,  \
-         Reader("/audio.speaker") as r_speak, \
-         Reader("/camera.points") as r_pts:
+    with Reader("camera.jpeg") as r_jpeg,  \
+         Reader("drive.ctrl") as r_ctrl,   \
+         Reader("drive.state") as r_state, \
+         Reader("drive.status") as r_status, \
+         Reader("audio.mic") as r_mic,  \
+         Reader("led_strip.ctrl") as r_led,  \
+         Reader("audio.speaker") as r_speak, \
+         Reader("camera.points") as r_pts:
         while True:
             if r_jpeg.ready():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])

@@ -12,8 +12,8 @@ SERVICES = {
     "manager": {"type": "simple", "as_user": True, 
                 "exec_start": f"{DAEMONS_DIR}/manager/result/bin/manager {DAEMONS_DIR}", 
                 "env": f""},
-    "autostart": {"type": "simple", 
-            "exec_start": f"/bin/bash -c -l 'uv run {BIN_DIR}/autostart {APP_DIRS}'",
+    "app_manager": {"type": "simple", 
+            "exec_start": f"/bin/bash -c -l 'uv run {BIN_DIR}/app_manager {APP_DIRS}'",
             "as_user": True,
             "env": "PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
 }
@@ -62,35 +62,6 @@ def check_and_install_uv():
     bashrc = Path.home() / ".bashrc"
     append_if_not_exists("source ~/.cargo/env", bashrc)
     print("[!] uv installation complete.")
-
-
-def generate_openssl_cert(days=30):
-    cert_dir = Path.home() / ".auth"
-    cert_dir.mkdir(exist_ok=True)
-
-    key_path = cert_dir / "key.pem"
-    cert_path = cert_dir / "cert.pem"
-
-    if key_path.exists() and cert_path.exists():
-        print("OpenSSL Cert exists! Skipping...")
-        return
-    subprocess.run([
-        "openssl",
-        "req",
-        "-x509",
-        "-nodes",
-        "-newkey",
-        "rsa:2048",
-        "-keyout",
-        str(key_path),
-        "-out",
-        str(cert_path),
-        "-days",
-        str(days),
-        "-subj",
-        f"/CN=bracketbot.home",
-    ],
-                   check=True)
 
 
 def build_daemon(path: Path):
@@ -159,7 +130,6 @@ def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
 def main():
     check_and_install_uv()
     check_and_install_nix()
-    generate_openssl_cert()
 
     add_to_PATH = []
     # build

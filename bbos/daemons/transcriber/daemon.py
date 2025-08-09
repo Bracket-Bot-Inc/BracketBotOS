@@ -64,6 +64,6 @@ def main(r_mic, w_text):
             pass
 
 if __name__ == "__main__":
-    with Reader("/audio.mic") as r_mic, \
-         Writer("/transcript", Type('transcriber_text')) as w_text:
+    with Reader("audio.mic") as r_mic, \
+         Writer("transcript", Type('transcriber_text')) as w_text:
         main(r_mic, w_text)

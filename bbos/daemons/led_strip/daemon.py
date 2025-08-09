@@ -7,7 +7,7 @@ from pi5neo import Pi5Neo
 if __name__ == "__main__":
     CFG = Config("led_strip")
     neo = Pi5Neo(CFG.spi_device, CFG.num_leds, CFG.spi_speed)
-    with Reader('/led_strip.ctrl') as r_ctrl:
+    with Reader('led_strip.ctrl') as r_ctrl:
         print(f"[LED] Daemon started - {CFG.num_leds} LEDs")
         while True:
             if r_ctrl.ready():

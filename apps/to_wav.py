@@ -34,7 +34,7 @@ print(f"[+] Writing {DURATION} s of mic audio to {OUT_PATH} …")
 # --------------------------------------------------------------------------- #
 # 2. Stream mic chunks directly into the file.
 # --------------------------------------------------------------------------- #
-with Reader("/audio.mic") as r_mic:
+with Reader("audio.mic") as r_mic:
     start = time.monotonic()
     i = 0
     while time.monotonic() - start < DURATION:

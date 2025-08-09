@@ -23,7 +23,7 @@ class speakerphone:
 # ----------------------------------------------------------------------
 # Types
 # ----------------------------------------------------------------------
-@realtime(ms=speakerphone.speaker_ms+5)
+@realtime(ms=speakerphone.speaker_ms)
 def speakerphone_speaker():
     return [
         ("audio", np.int16, (speakerphone.speaker_chunk_size, speakerphone.speaker_channels)),  # chunk_size, channels

@@ -58,9 +58,9 @@ if __name__ == "__main__":
     print(f"[AudioLED] Green bar = Speaker volume, Blue bar = Mic volume")
     print(f"[AudioLED] Volume sensitivity: {VOLUME_SENSITIVITY}, Ramp speed: {RAMP_SPEED}")
     
-    with Reader("/audio.mic") as r_mic, \
-         Reader("/audio.speaker") as r_speaker, \
-         Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led:
+    with Reader("audio.mic") as r_mic, \
+         Reader("audio.speaker") as r_speaker, \
+         Writer("led_strip.ctrl", Type("led_strip_ctrl")) as w_led:
         # Animation state - use float for smooth ramping
         current_led_count = 0.0
         current_color = OFF

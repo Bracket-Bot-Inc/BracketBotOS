@@ -51,7 +51,7 @@ def main():
     buf_type = ctypes.c_int(v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE)
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMON, buf_type)
     mv = memoryview(mmap_buf)
-    with Writer('/camera.jpeg', Type("camera_jpeg")(buf.length)) as w:
+    with Writer('camera.jpeg', Type("camera_jpeg")(buf.length)) as w:
         while True:
             # Queue buffer
             fcntl.ioctl(fd, v4l2.VIDIOC_QBUF, buf)

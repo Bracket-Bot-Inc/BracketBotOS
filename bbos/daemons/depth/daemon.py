@@ -106,9 +106,9 @@ def main():
     baseline_m = abs(P2_cam[0, 3] / P2_cam[0, 0]) / 1000.0
     fx_ds = P1_cam[0, 0] * CFG_D.downsample
 
-    with Reader('/camera.jpeg') as r_jpeg, \
-            Writer('/camera.depth', lambda: Type("camera_depth")(height_D, width_D)) as w_depth, \
-            Writer('/camera.points', lambda: Type("camera_points")(num_pts)) as w_points:
+    with Reader('camera.jpeg') as r_jpeg, \
+            Writer('camera.depth', lambda: Type("camera_depth")(height_D, width_D)) as w_depth, \
+            Writer('camera.points', lambda: Type("camera_points")(num_pts)) as w_points:
         
         print(f"OpenCL available: {cv2.ocl.haveOpenCL()}", flush=True)
         if cv2.ocl.haveOpenCL():

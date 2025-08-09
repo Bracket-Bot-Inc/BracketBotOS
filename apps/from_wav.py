@@ -26,7 +26,7 @@ try:
     # --------------------------------------------------------------------------- #
     # 2. Stream WAV chunks to speaker with resampling from 16kHz to 48kHz
     # --------------------------------------------------------------------------- #
-    with Writer("/audio.speaker", Type("speakerphone_speaker")) as w_speaker:
+    with Writer("audio.speaker", Type("speakerphone_speaker")) as w_speaker:
         i = 0
 
         start = time.monotonic()

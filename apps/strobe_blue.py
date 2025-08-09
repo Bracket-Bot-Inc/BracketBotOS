@@ -28,7 +28,7 @@ def calculate_breathing_brightness(elapsed_time, duration):
 
 if __name__ == "__main__":
     CFG = Config("led_strip")
-    with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_ctrl:
+    with Writer("led_strip.ctrl", Type("led_strip_ctrl")) as w_ctrl:
         start_time = time.time()
         
         print("Starting blue breathing effect...")

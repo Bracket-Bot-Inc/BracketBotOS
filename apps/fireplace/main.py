@@ -198,8 +198,8 @@ if __name__ == "__main__":
         print(f"🔥 [Fireplace] To use real audio, put your fireplace audio file at: {AUDIO_FILE_PATH}")
     
     try:
-        with Writer("/led_strip.ctrl", Type("led_strip_ctrl")) as w_led, \
-             Writer("/audio.speaker", Type("speakerphone_speaker")) as w_audio:
+        with Writer("led_strip.ctrl", Type("led_strip_ctrl")) as w_led, \
+             Writer("audio.speaker", Type("speakerphone_speaker")) as w_audio:
             
             print("🔥 [Fireplace] Fire is burning! Press Ctrl+C to extinguish...")
             

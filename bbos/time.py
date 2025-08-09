@@ -32,7 +32,7 @@ time_store = struct.Struct("<q")
 
 def _get_lockfile(name):
     pth = f"{Path(sys.modules['__main__'].__file__).parent.name}_{Path(sys.modules['__main__'].__file__).name[:-3]}"
-    return f"/tmp{name}_{pth}_time_lock"
+    return f"/tmp/{name}_{pth}_time_lock"
 
 class TimeLog:
     def __init__(self, name):
@@ -52,7 +52,7 @@ class TimeLog:
         return self._buf.avg()
 
     def close(self):
-        os.unlink(_get_lockfile(self._name))
+        os.remove(_get_lockfile(self._name))
 
 class TimeRead: 
     def __init__(self, name):

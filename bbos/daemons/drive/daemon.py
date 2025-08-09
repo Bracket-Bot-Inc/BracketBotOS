@@ -7,9 +7,9 @@ CFG_drive = Config("drive")
 CFG_odrive = Config("odrive")
 
 if __name__ == "__main__":
-    with Writer('/drive.state', Type("drive_state"))   as w_state, \
-         Writer('/drive.status', Type("drive_status")) as w_status, \
-         Reader('/drive.ctrl')                         as r_ctrl:
+    with Writer('drive.state', Type("drive_state"))   as w_state, \
+         Writer('drive.status', Type("drive_status")) as w_status, \
+         Reader('drive.ctrl')                         as r_ctrl:
         od = ODriveUART(CFG_odrive)
         od.clear_errors_left()
         od.clear_errors_right()

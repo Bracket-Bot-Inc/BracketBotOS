@@ -3,11 +3,11 @@ from bbos.registry import Type
 from bbos.time import TimeLog, Loop, Realtime
 from bbos.os_utils import CACHE_LINE
 
-import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, mmap, numpy as np, time
+import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit, mmap, numpy as np, time
 from pathlib import Path
 
 def _get_lockfile(name):
-    return f"/tmp{name}_lock"
+    return f"/tmp/daemon-{name}_lock"
 
 def _caller_sig():
     f = inspect.stack()[2]
@@ -110,9 +110,11 @@ class Writer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_val, exc_tb)
-        self._shm.unlink()
-        os.close(self._lock_fd)
-        os.unlink(self._lockfile)
+        if self._lock_fd:
+            self._shm.unlink()
+            os.close(self._lock_fd)
+        if self._lockfile:
+            os.unlink(self._lockfile)
         return True
 
 
@@ -127,7 +129,6 @@ class Reader:
         self._data = None
         self._keeptime = keeptime
         if keeptime:
-            print("READER trigger")
             self._trigger = [0] # mutable counter
             Loop.init(self._trigger)
 

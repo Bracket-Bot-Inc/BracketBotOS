@@ -1,10 +1,10 @@
 # AUTO
 # /// script
 # dependencies = [
+#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "fastapi",
 #   "uvicorn",
 #   "wsproto",
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
 # ///
 import asyncio
@@ -15,8 +15,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import uvicorn
 
-from bbos.app_manager import AppManager
-from bbos.paths import KEY_PTH, CERT_PTH
+from bbos.app_manager import get_status, start_app, stop_app
 
 REFRESH_TIME: float = 2.0  # seconds
 
@@ -28,7 +27,7 @@ def _sigint(*_):
 
 signal.signal(signal.SIGINT, _sigint)
 
-def main(app_manager):
+def main():
     app = FastAPI()
     
     @app.get("/", response_class=HTMLResponse)
@@ -127,38 +126,6 @@ h1, h2 {
   cursor: not-allowed;
 }
 
-.lock-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-  margin-top: 15px;
-}
-
-.lock-item {
-  background: #333;
-  padding: 10px;
-  border-radius: 6px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.lock-status {
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.lock-active {
-  background: #4CAF50;
-  color: white;
-}
-
-.lock-inactive {
-  background: #666;
-  color: white;
-}
-
 .loading {
   text-align: center;
   color: #888;
@@ -172,11 +139,6 @@ h1, h2 {
   <div class="section">
     <h2>Applications</h2>
     <div id="apps-container" class="loading">Loading apps...</div>
-  </div>
-  
-  <div class="section">
-    <h2>Lock Files Status</h2>
-    <div id="locks-container" class="loading">Loading lock files...</div>
   </div>
 </div>
 
@@ -194,7 +156,7 @@ function connectWebSocket() {
   
   ws.onmessage = function(event) {
     const data = JSON.parse(event.data);
-    updateUI(data);
+    updateApps(data);
   };
   
   ws.onclose = function() {
@@ -220,15 +182,6 @@ function toggleApp(appName, isRunning) {
   }
 }
 
-function updateUI(data) {
-  if (data.apps) {
-    updateApps(data.apps);
-  }
-  if (data.locks) {
-    updateLocks(data.locks);
-  }
-}
-
 function updateApps(apps) {
   const container = document.getElementById("apps-container");
   container.innerHTML = "";
@@ -239,8 +192,7 @@ function updateApps(apps) {
     return;
   }
   
-  for (const [appName, status] of Object.entries(apps)) {
-    const isRunning = status.running;
+  for (const [appName, isRunning] of Object.entries(apps)) {
     const card = document.createElement("div");
     card.className = `app-card ${isRunning ? "running" : "stopped"}`;
     
@@ -248,7 +200,6 @@ function updateApps(apps) {
       <div class="app-name">${appName}</div>
       <div class="app-status ${isRunning ? "status-running" : "status-stopped"}">
         ${isRunning ? "RUNNING" : "STOPPED"}
-        ${status.pid ? ` (PID: ${status.pid})` : ""}
       </div>
       <button class="toggle-btn" onclick="toggleApp('${appName}', ${isRunning})">
         ${isRunning ? "Stop" : "Start"} App
@@ -256,31 +207,6 @@ function updateApps(apps) {
     `;
     
     container.appendChild(card);
-  }
-}
-
-function updateLocks(locks) {
-  const container = document.getElementById("locks-container");
-  container.innerHTML = "";
-  container.className = "lock-grid";
-  
-  if (Object.keys(locks).length === 0) {
-    container.innerHTML = "<div class='loading'>No lock files found</div>";
-    return;
-  }
-  
-  for (const [lockName, isActive] of Object.entries(locks)) {
-    const item = document.createElement("div");
-    item.className = "lock-item";
-    
-    item.innerHTML = `
-      <span>${lockName}</span>
-      <span class="lock-status ${isActive ? "lock-active" : "lock-inactive"}">
-        ${isActive ? "ACTIVE" : "INACTIVE"}
-      </span>
-    `;
-    
-    container.appendChild(item);
   }
 }
 
@@ -294,7 +220,7 @@ setInterval(requestStatus, """ + str(int(REFRESH_TIME * 1000)) + """);
     async def websocket_endpoint(websocket: WebSocket):
         await websocket.accept()
         print("[dashboard] WebSocket client connected")
-        status = lambda: app_manager.get_status(exclude=['dashboard'])
+        status = lambda: get_status(exclude=['dashboard'])
         try:
             while not _stop:
                 try:
@@ -308,14 +234,14 @@ setInterval(requestStatus, """ + str(int(REFRESH_TIME * 1000)) + """);
                     elif data.get("action") == "start_app":
                         app_name = data.get("app_name")
                         if app_name:
-                            success = app_manager.start_app(app_name)
+                            success = start_app(app_name)
                             if success:
                                 await websocket.send_text(json.dumps(status()))
                     
                     elif data.get("action") == "stop_app":
                         app_name = data.get("app_name")
                         if app_name:
-                            success = app_manager.stop_app(app_name)
+                            success = stop_app(app_name)
                             print(f"[dashboard] Stopping app: {app_name} - {success}")
                             if success:
                                 await websocket.send_text(json.dumps(status()))
@@ -331,16 +257,13 @@ setInterval(requestStatus, """ + str(int(REFRESH_TIME * 1000)) + """);
 
     # Run the server
     uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8001,
-        ws="wsproto",
-        log_level="info",
-            ssl_keyfile=str(KEY_PTH),
-            ssl_certfile=str(CERT_PTH),
-        )
+      app,
+      host="0.0.0.0",
+      port=8001,
+      ws="wsproto",
+      log_level="info",
+    )
 
 
 if __name__ == "__main__":
-    app_manager = AppManager(Path(__file__).parent)
-    main(app_manager) 
+    main() 
