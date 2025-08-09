@@ -16,14 +16,14 @@ class drive:
 
 @register
 class odrive:
-    serial_port: str = "/dev/ttyS2"
+    serial_port: str = "/dev/ttyS0"
     baudrate: int = 115200
     timeout: int = 15  # seconds
     left_axis: int = 0
     right_axis: int = 1
     axis_state_closed_loop: int = 8
     dir_left: int = 1  # Motor direction for left axis (1 or -1)
-    dir_right: int = -1  # Motor direction for right axis (1 or -1)
+    dir_right: int = 1  # Motor direction for right axis (1 or -1)
     wheel_diam: float = 0.165
     torque_bias: float = 0.05
 

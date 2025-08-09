@@ -19,17 +19,19 @@ def press(key):
     global writer, pressed
     if writer is None:
         return
+    speed = 0.0
+    turn = 0.0
     if key.lower() == 'w':
-        writer['twist'] = np.array([-SPEED,0.0], dtype=np.float32)
+        speed = SPEED
     elif key.lower() == 's':
-        writer['twist'] = np.array([SPEED, 0.0], dtype=np.float32)
+        speed = -SPEED
     elif key.lower() == 'a':
-        writer['twist'] = np.array([0.0, -TURN_SPEED], dtype=np.float32)
+        turn = -TURN_SPEED
     elif key.lower() == 'd':
-        writer['twist'] = np.array([0.0, TURN_SPEED], dtype=np.float32)
+        turn = TURN_SPEED
     elif key.lower() == 'q':
-        # Quit
         stop_listening()
+    writer['twist'] = [speed, turn]
 
 def release(key):
     """Handle key release events - stop the robot"""
