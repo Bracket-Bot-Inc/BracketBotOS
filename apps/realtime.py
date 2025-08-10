@@ -236,6 +236,7 @@ def main():
         stop_event = threading.Event()        
         thread = threading.Thread(target=asyncio.run, args=(manager.start(stop_event),))
         thread.start()
+        j = 0
         with Reader("audio.mic") as r_mic, \
             Writer("audio.speaker", Type("speakerphone_speaker")) as w_speaker:
             speaker_chunks = CFG.speaker_ms // OUTPUT_BASE_CHUNK_MS
@@ -254,6 +255,8 @@ def main():
                         except queue.Empty: pass
                         mic.queue.put_nowait(resampled)
                 if w_speaker._update():
+                    j += 1
+                    print("Speaker update: ", j)
                     for i in range(speaker_chunks):
                         try:
                             full_chunk[i] = speaker.queue.get_nowait()
