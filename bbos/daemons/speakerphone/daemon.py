@@ -62,6 +62,9 @@ def main(w_mic, r_speak):
     while True:
         if r_speak.ready():
             data = r_speak.data["audio"]
+            y = (data.astype(np.float32) / 32768.0) * CFG.volume
+            y = np.clip(y, -1.0, 1.0)
+            data = (y * 32768.0).astype(np.int16)
             spk_stream.write(data)
         if not r_speak.readable:
             spk_stream.write(zeros)

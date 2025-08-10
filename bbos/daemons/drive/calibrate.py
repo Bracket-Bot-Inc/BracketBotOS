@@ -481,7 +481,6 @@ if __name__ == '__main__':
 
     try:
 
-        subprocess.run(["stop drive"], check=False)
         print("\n\033[1;33mDrive Calibration\033[0m")
         print("\nThis script will run two calibration steps:")
         print(
@@ -510,8 +509,6 @@ if __name__ == '__main__':
 
         test_motor_direction()
         print("\n\033[1;32mDrive calibration complete!\033[0m")
-
-        subprocess.run(["restart"], check=False)
 
     except KeyboardInterrupt:
         print(f"\n{YELLOW}Calibration interrupted by user.{RESET}")

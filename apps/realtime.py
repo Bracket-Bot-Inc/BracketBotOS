@@ -17,92 +17,61 @@ from av import AudioFrame
 from bbos import Reader, Writer, Config, Type
 import numpy as np
 from dotenv import load_dotenv
+import threading
 import fractions
 from scipy import signal
+import queue
 
 CFG = Config("speakerphone")
-REALTIME_SAMPLE_RATE = 24000  # OpenAI Realtime API expects 24kHz
+REALTIME_INPUT_SAMPLE_RATE = 24000  # OpenAI Realtime API expects 24kHz
+REALTIME_OUTPUT_SAMPLE_RATE = 48000
+REALTIME_OUTPUT_MS = 20
+OUTPUT_BASE_CHUNK_MS = np.gcd(CFG.speaker_ms, REALTIME_OUTPUT_MS)
+REALTIME_OUTPUT_CHUNKS = REALTIME_OUTPUT_MS // OUTPUT_BASE_CHUNK_MS
 
 class Mic(AudioStreamTrack):
     kind = "audio"
 
-    def __init__(self, reader):
+    def __init__(self):
         super().__init__()
-        self.reader = reader
+        self.queue = queue.Queue(maxsize=20)
+        self.time_base = fractions.Fraction(1, REALTIME_INPUT_SAMPLE_RATE)
         self.pts = 0
-        self.time_base = fractions.Fraction(1, REALTIME_SAMPLE_RATE)
 
     async def recv(self):
         while True:
-            if self.reader.ready():
-                audio_data = self.reader.data["audio"]
-                
-                # Convert stereo to mono if needed
-                if audio_data.shape[1] == 2:
-                    mono_data = ((audio_data[:, 0] + audio_data[:, 1]) // 2).astype(np.int16)
-                else:
-                    mono_data = audio_data[:, 0].astype(np.int16)
-                
-                # Resample from 16kHz to 24kHz for OpenAI
-                if CFG.mic_sample_rate != REALTIME_SAMPLE_RATE:
-                    resampled = signal.resample_poly(mono_data.astype(np.float32), 
-                                                   REALTIME_SAMPLE_RATE, CFG.mic_sample_rate)
-                    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
-                else:
-                    resampled = mono_data
-                
-                # Create AudioFrame with 24kHz sample rate
-                frame = AudioFrame.from_ndarray(resampled.reshape(1, -1), format='s16', layout='mono')
-                frame.sample_rate = REALTIME_SAMPLE_RATE
-                frame.pts = self.pts
-                self.pts += len(resampled)
-                return frame
-            await asyncio.sleep(0.001)
+            try:
+                frame = self.queue.get_nowait()
+                break
+            except queue.Empty:
+                await asyncio.sleep(0.005)
+        try:
+            af = AudioFrame.from_ndarray(frame, format='s16', layout='mono')
+        except Exception as e:
+            return None
+        af.sample_rate = REALTIME_INPUT_SAMPLE_RATE
+        af.pts = self.pts
+        self.pts += len(frame)
+        return af
 
 class Speaker:
-    def __init__(self, writer):
-        self.writer = writer
-        self.buffer = np.array([], dtype=np.int16)
+    def __init__(self):
+        self.queue = queue.Queue(maxsize=20)
 
-    async def play_frame(self, frame):
+    async def send(self, frame):
         try:
-            audio_data = frame.to_ndarray()
-            #print(f"Raw frame: shape={audio_data.shape}, max_val={np.max(np.abs(audio_data))}")
-            
-            # Flatten if needed (remove extra dimensions)
-            if audio_data.ndim > 1 and audio_data.shape[0] == 1:
-                audio_data = audio_data.flatten()
-            
-            # Check what OpenAI actually reports
-            frame_sample_rate = getattr(frame, 'sample_rate', 48000)
-            
-            if CFG.speaker_sample_rate != frame_sample_rate:
-                resampled = signal.resample_poly(audio_data.astype(np.float32), 
-                                               CFG.speaker_sample_rate, frame_sample_rate * 2)
-                resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
-                #print(f"After resample: {len(resampled)} samples, max_val={np.max(np.abs(resampled))}")
-            else:
-                resampled = audio_data.astype(np.int16)
-            
-            # Add to buffer
-            self.buffer = np.concatenate([self.buffer, resampled])
-            
-            # Only write when we have enough for one chunk
-            if len(self.buffer) >= CFG.speaker_chunk_size:
-                chunk = self.buffer[:CFG.speaker_chunk_size]
-                self.buffer = self.buffer[CFG.speaker_chunk_size:]
-                # Convert to proper channels
-                if CFG.speaker_channels == 2:
-                    chunk_shaped = np.repeat(chunk.reshape(-1, 1), 2, axis=1)
-                else:
-                    chunk_shaped = chunk.reshape(-1, 1)
-                
-                #print(f"Writing chunk: {chunk_shaped.shape}, max_val={np.max(np.abs(chunk_shaped))}")
-                
-                # Write one chunk - match bbos timing
-                with self.writer.buf() as b:
-                    b['audio'] = chunk_shaped
-                
+            ch = len(frame.layout.channels)
+            audio_data = frame.to_ndarray().reshape(-1, ch)[:,0]
+            assert audio_data.flatten().shape[0] == REALTIME_OUTPUT_SAMPLE_RATE // 1000 * REALTIME_OUTPUT_MS, print("Got ", audio_data.shape)
+            audio_data = audio_data.reshape(REALTIME_OUTPUT_CHUNKS, -1)
+            for i in range(REALTIME_OUTPUT_CHUNKS):
+                audio_data_i = audio_data[i].flatten()
+                try:
+                    self.queue.put_nowait(audio_data_i)
+                except queue.Full:
+                    try: self.queue.get_nowait()
+                    except queue.Empty: pass
+                    self.queue.put_nowait(audio_data_i)
         except Exception as e:
             print(f"Speaker error: {e}")
 
@@ -111,7 +80,12 @@ class WebRTCManager:
     SESSION_URL = f"{API_BASE}/realtime/sessions"
     STREAM_URL = f"{API_BASE}/realtime"
 
-    def __init__(self, api_key, model, system_prompt, mic_track, speaker):
+    def __init__(self, model, mic_track, speaker):
+        load_dotenv()
+        api_key = os.getenv("OPENAI_API_KEY")
+        assert api_key,print("OPENAI_API_KEY missing in environment")
+        system_prompt = os.getenv("OPENAI_SYSTEM_PROMPT", 
+                                "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.")  
         self.api_key = api_key
         self.model = model
         self.system_prompt = system_prompt
@@ -150,7 +124,8 @@ class WebRTCManager:
         try:
             while True:
                 frame = await track.recv()
-                await self.audio_out.play_frame(frame)
+                await self.audio_out.send(frame)
+                await asyncio.sleep(0.005)
         except Exception as e:
             print(f"Audio track error: {e}")
 
@@ -197,22 +172,27 @@ class WebRTCManager:
                 "session": {
                     "modalities": ["audio"],
                     "instructions": self.system_prompt,
-
+                    "voice": "shimmer",
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "turn_detection": {
+                        "type": "server_vad",
+                        "threshold": 0.5,
+                        "prefix_padding_ms": 300,
+                        "silence_duration_ms": 500,
+                        "create_response": True,
+                        "interrupt_response": False,
+                    }
                 }
             }
             self.data_channel.send(json.dumps(session_update))
-            
             # Trigger initial response
             await asyncio.sleep(0.1)
             response_create = {
                 "type": "response.create",
                 "response": {
                     "modalities": ["audio"],
-                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.",
-                    "voice": "shimmer",
-                    "input_audio_format": "pcm16",
-                    "output_audio_format": "pcm16",
-                    "turn_detection": None
+                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering."
                 }
             }
             self.data_channel.send(json.dumps(response_create))
@@ -222,13 +202,7 @@ class WebRTCManager:
 
     async def _get_ephemeral_token(self):
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {"model": self.model, "voice": "alloy",
-                    "instructions": "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.",
-                    "voice": "shimmer",
-                    "input_audio_format": "pcm16",
-                    "output_audio_format": "pcm16",
-                    "turn_detection": None
-        }
+        payload = {"model": self.model, "voice": "alloy"}
         if self.system_prompt:
             payload["instructions"] = self.system_prompt
 
@@ -240,40 +214,58 @@ class WebRTCManager:
                 
                 result = await resp.json()
                 return result["client_secret"]["value"]
-
-async def main():
-    load_dotenv()
-    api_key = os.getenv("OPENAI_API_KEY")
-    
-    SYSTEM_PROMPT = os.getenv("OPENAI_SYSTEM_PROMPT", 
-                             "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.")  
-    
-    if not api_key:
-        print("OPENAI_API_KEY missing in environment")
-        return
-
-    with Reader("audio.mic") as r_mic, \
-        Writer("audio.speaker", Type("speakerphone_speaker")) as w_speaker:
-
-        mic = Mic(reader=r_mic)
-        speaker = Speaker(writer=w_speaker)
-        manager = WebRTCManager(api_key=api_key, model="gpt-4o-realtime-preview",
-                                system_prompt=SYSTEM_PROMPT,
-                                mic_track=mic, speaker=speaker)
-
+    async def start(self, stop_event):
+        await self.create_connection()
+        await self.connect_to_openai()
+        print("Streaming. Ctrl+C to exit.")
         try:
-            await manager.create_connection()
-            await manager.connect_to_openai()
-            print("Streaming. Ctrl+C to exit.")
-            
-            while True:
+            while not stop_event.is_set():
                 await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            if manager.pc:
-                await manager.pc.close()
+            if self.pc:
+                await self.pc.close()
             print("Shutdown complete.")
         except Exception as e:
             print(f"Error: {e}")
 
+def main():
+        mic = Mic()
+        speaker = Speaker()
+        manager = WebRTCManager(model="gpt-4o-realtime-preview",
+                                mic_track=mic, speaker=speaker)
+
+        stop_event = threading.Event()        
+        thread = threading.Thread(target=asyncio.run, args=(manager.start(stop_event),))
+        thread.start()
+        with Reader("audio.mic") as r_mic, \
+            Writer("audio.speaker", Type("speakerphone_speaker")) as w_speaker:
+            speaker_chunks = CFG.speaker_ms // OUTPUT_BASE_CHUNK_MS
+            full_chunk = np.zeros((speaker_chunks, REALTIME_OUTPUT_SAMPLE_RATE // 1000 * OUTPUT_BASE_CHUNK_MS))
+            resampled = np.zeros((CFG.speaker_chunk_size, CFG.speaker_channels))
+            while True:
+                if r_mic.ready():
+                    resampled = signal.resample_poly(r_mic.data['audio'].astype(np.float32), 
+                                                REALTIME_INPUT_SAMPLE_RATE, CFG.mic_sample_rate)
+                    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
+                    try:
+                        mic.queue.put_nowait(resampled.reshape(1, -1))
+                    except queue.Full:
+                        # drop oldest: clear one and reinsert (keeps capture real-time)
+                        try: mic.queue.get_nowait()
+                        except queue.Empty: pass
+                        mic.queue.put_nowait(resampled)
+                if w_speaker._update():
+                    for i in range(speaker_chunks):
+                        try:
+                            full_chunk[i] = speaker.queue.get_nowait()
+                        except queue.Empty:
+                            print("Empty queue")
+                            full_chunk[i] = 0
+                    resampled = signal.resample_poly(full_chunk.flatten().astype(np.float32), 
+                                                CFG.speaker_sample_rate, REALTIME_OUTPUT_SAMPLE_RATE)
+                    resampled = np.clip(resampled, -32768, 32767).astype(np.int16)
+                    with w_speaker.buf() as b:
+                        b['audio'] = resampled.reshape(-1, CFG.speaker_channels)
+        stop_event.set()
+        thread.join()
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

@@ -22,4 +22,4 @@ if not calibrate_py.exists():
 os.chdir(daemon_dir)
 os.environ["PATH"] = f"/home/{CURRENT_USER}/.nix-profile/bin"
 cmd = ["nix-shell", "--run", f"python calibrate.py {daemon_name}"]
-sys.exit(subprocess.run(cmd, check=True))
+os.execvp(cmd[0], cmd)
