@@ -19,18 +19,18 @@ os.environ['ULTRALYTICS_QUIET'] = 'True'
 os.environ['DISABLE_ULTRALYTICS_VERSIONING_CHECK'] = 'True'
 
 
-TURN_SPEED = 0.3
+TURN_SPEED = 5
 CENTER_THRESHOLD = 0.05
-FORWARD_SPEED = 2.0 # Speed for moving forward/backward
+FORWARD_SPEED = 1 # Speed for moving forward/backward
 TARGET_WIDTH_RATIO = 0.3  # Target width of person relative to image width
 WIDTH_THRESHOLD = 0.05  # Acceptable range around target width
 MODEL_PATH = "yolov8n.pt"
 OPENVINO_MODEL_PATH = "yolov8n_openvino_model"  # Not used anymore
 
 # Speed control parameters
-MAX_FORWARD_SPEED = 10  # Maximum speed when person is far
-MIN_FORWARD_SPEED = 0.3  # Minimum speed when person is close
-SPEED_SCALE_FACTOR = 3.0  # How aggressively speed changes with distance
+MAX_FORWARD_SPEED = 2  # Maximum speed when person is far
+MIN_FORWARD_SPEED = 0.1  # Minimum speed when person is close
+SPEED_SCALE_FACTOR = 2.0  # How aggressively speed changes with distance
 
 def main():
     # Load the PyTorch model directly
@@ -115,11 +115,11 @@ def main():
                 print(f"Within threshold, no forward/backward movement")
             
             if abs(x_error) < CENTER_THRESHOLD:
-                cmd[:] = [0, -forward_speed]  # Note: negative sign to match robot's convention
+                cmd[:] = [-forward_speed, 0]  # Note: negative sign to match robot's convention
             elif x_error > 0:
-                cmd[:] = [TURN_SPEED*abs(x_error), -forward_speed]  # Note: negative sign
+                cmd[:] = [forward_speed, TURN_SPEED*abs(x_error)]  # Note: negative sign
             else:
-                cmd[:] = [-TURN_SPEED*abs(x_error), -forward_speed]  # Note: negative sign
+                cmd[:] = [forward_speed, -TURN_SPEED*abs(x_error)]  # Note: negative sign
             with w_ctrl.buf() as b:
                 b['twist'] = cmd
             print(x_error, width_error)

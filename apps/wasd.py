@@ -9,7 +9,7 @@ from sshkeyboard import listen_keyboard, stop_listening
 import numpy as np
 
 # Configuration
-TURN_SPEED = 5.0  # Linear speed in m/s
+TURN_SPEED = 4.0  # Linear speed in m/s
 SPEED = 0.5  # Angular speed in rad/s
 # Global variables
 writer = None
