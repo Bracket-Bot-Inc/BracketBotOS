@@ -1,5 +1,20 @@
 import math, struct, sys, os, time, numpy as np
 from pathlib import Path
+import ctypes
+from ctypes import c_long, c_int
+
+librt = ctypes.CDLL("librt.so.1", use_errno=True)
+CLOCK_MONOTONIC = 1
+
+class timespec(ctypes.Structure):
+    _fields_ = [("tv_sec", c_long),
+                ("tv_nsec", c_long)]
+
+def ns_sleep(ns: int):
+    sec = ns // 1_000_000_000
+    nsec = ns % 1_000_000_000
+    ts = timespec(sec, nsec)
+    librt.clock_nanosleep(CLOCK_MONOTONIC, 0, ctypes.byref(ts), None)
 
 # https://github.com/commaai/openpilot/blob/master/common/util.py#L23
 class MovingAverage:
@@ -73,7 +88,6 @@ class TimeRead:
     def close(self):
         os.close(self._f)
 
-    
 class Loop:
     _latency = 100 # ms
     _last = -1
@@ -87,16 +101,11 @@ class Loop:
         if Loop._i == Loop._num_calls - 1:
             Loop._i = 0 
             if Loop._last > 0:
-                now = time.monotonic()
-                sleep_for = 1e-3*Loop._latency - (now - Loop._last)
-                Loop._last = now
-                if sleep_for >= 0 or abs(sleep_for) < 1.5e-3:
-                    if abs(sleep_for) < 1.5e-3:
-                        sleep_for = 1e-3*Loop._latency
+                sleep_for = 1_000_000*Loop._latency - (time.monotonic_ns() - Loop._last)
+                if sleep_for >= 0:
                     if Loop._manage_latency:
-                        time.sleep(sleep_for)
-            else:
-                Loop._last = time.monotonic()
+                        ns_sleep(sleep_for)
+            Loop._last = time.monotonic_ns()
             for trigger, reset in Loop._triggers.values():
                 trigger[0] = (trigger[0] + 1) % reset
         else:
@@ -106,6 +115,7 @@ class Loop:
     def init(trigger):
         Loop._num_calls += 1
         Loop._triggers[hex(id(trigger))] = [trigger,1]
+        print(Loop._triggers)
 
     @staticmethod
     def manage_latency(value):
