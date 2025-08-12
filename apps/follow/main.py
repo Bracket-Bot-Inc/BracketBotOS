@@ -21,16 +21,16 @@ os.environ['DISABLE_ULTRALYTICS_VERSIONING_CHECK'] = 'True'
 
 TURN_SPEED = 3
 CENTER_THRESHOLD = 0.05
-FORWARD_SPEED = 0.5 # Speed for moving forward/backward
+FORWARD_SPEED = 1 # Speed for moving forward/backward
 TARGET_WIDTH_RATIO = 0.3  # Target width of person relative to image width
 WIDTH_THRESHOLD = 0.05  # Acceptable range around target width
 MODEL_PATH = "yolov8n.pt"
 OPENVINO_MODEL_PATH = "yolov8n_openvino_model"  # Not used anymore
 
 # Speed control parameters
-MAX_FORWARD_SPEED = 2  # Maximum speed when person is far
-MIN_FORWARD_SPEED = 0.1  # Minimum speed when person is close
-SPEED_SCALE_FACTOR = 0.2  # How aggressively speed changes with distance
+MAX_FORWARD_SPEED = 2 # Maximum speed when person is far
+MIN_FORWARD_SPEED = 0.05  # Minimum speed when person is close
+SPEED_SCALE_FACTOR = 1  # How aggressively speed changes with distance
 
 def main():
     # Load the PyTorch model directly
@@ -103,13 +103,15 @@ def main():
                         # When going backward (person too close), use a more conservative speed
                         speed_multiplier = min(width_error * SPEED_SCALE_FACTOR, 1.0)
                         forward_speed = -MIN_FORWARD_SPEED - (MAX_FORWARD_SPEED - MIN_FORWARD_SPEED) * speed_multiplier * 0.5
-                
                 if abs(x_error) < CENTER_THRESHOLD:
-                    cmd[:] = [-forward_speed, 0]  # Note: negative sign to match robot's convention
+                    cmd[:] = [forward_speed, 0]  # Note: negative sign to match robot's convention
+                    print(f"Going FORWARD: speed = {forward_speed:.2f}")
                 elif x_error > 0:
                     cmd[:] = [forward_speed, TURN_SPEED*abs(x_error)]  # Note: negative sign
+                    print(f"Going RIGHT: speed = {forward_speed:.2f}")
                 else:
                     cmd[:] = [forward_speed, -TURN_SPEED*abs(x_error)]  # Note: negative sign
+                    print(f"Going BACKWARD: speed = {forward_speed:.2f}")
             with w_ctrl.buf() as b:
                 b['twist'] = cmd
 
