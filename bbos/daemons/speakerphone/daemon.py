@@ -40,6 +40,9 @@ def find_device_index(pattern, kind=None, flags=0):
 
 def main(w_mic, r_speak):
     def mic_cb(indata, frames, time_info, status):
+        y = (indata.astype(np.float32) / 32768.0) * CFG.mic_volume
+        y = np.clip(y, -1.0, 1.0)
+        indata = (y * 32768.0).astype(np.int16)
         w_mic["audio"] = indata
     # ── set up and run ───────────────────────────────────────────────────────
     sd.check_input_settings(samplerate=CFG.mic_sample_rate,  channels=CFG.mic_channels,  dtype='int16')
@@ -62,7 +65,7 @@ def main(w_mic, r_speak):
     while True:
         if r_speak.ready():
             data = r_speak.data["audio"]
-            y = (data.astype(np.float32) / 32768.0) * CFG.volume
+            y = (data.astype(np.float32) / 32768.0) * CFG.speaker_volume
             y = np.clip(y, -1.0, 1.0)
             data = (y * 32768.0).astype(np.int16)
             spk_stream.write(data)

@@ -7,8 +7,8 @@ _symbols = {
     "Config": "bbos.registry",
     "register": "bbos.registry",
     "realtime": "bbos.registry",
-    "Writer": "bbos.shm",
-    "Reader": "bbos.shm",
+    "Writer": "bbos.ipc",
+    "Reader": "bbos.ipc",
     "AppManager": "bbos.app_manager",
 }
 

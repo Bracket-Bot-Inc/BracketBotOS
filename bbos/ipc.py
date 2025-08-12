@@ -1,23 +1,63 @@
-from typing import List
+from typing import List, Set
 from bbos.registry import Type 
-from bbos.time import TimeLog, Loop, Realtime
+from bbos.time import TimeLog, Loop
 from bbos.os_utils import CACHE_LINE
 
-import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit, mmap, numpy as np, time
+import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit, mmap, time, selectors, socket
+import numpy as np
 from pathlib import Path
 
-def _get_lockfile(name):
-    return f"/tmp/daemon-{name}_lock"
+class Status:
+    PAYLOAD_SIZE = 4096
+    def __init__(self, name: str, data: bytes = None):
+        self._sock = self.name2socket(name)
+        self._data = data
+        self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        self._srv.bind(self._sock)
+        self._srv.listen()
+        self._srv.setblocking(False)
+        self._sel = selectors.DefaultSelector()
+        self._sel.register(self._srv, selectors.EVENT_READ)
+        self._clients = set()
+    @staticmethod
+    def name2socket(name):
+        return f"\0{name}.bbos"
+    def update(self, data=None):
+        if self._data is None:
+            self._data = data
+            assert self._data is not None, "No data to update!"
+        try:
+            for key, _ in self._sel.select(timeout=0):
+                if key.fileobj is self._srv:
+                    c, _ = self._srv.accept()
+                    c.sendall(self._data)
+                    c.setblocking(False)
+                    self._clients.add(c)
+            remove = set() 
+            for c in self._clients:
+                try:
+                    data = c.recv(1, socket.MSG_DONTWAIT)
+                    if not data:
+                        remove.add(c)
+                except BlockingIOError:
+                    pass 
+            self._clients -= remove
+        except Exception as e:
+            print(e)
+    def __del__(self):
+        for c in self._clients:
+            c.close()
+        self._srv.close()
+        self._sel.close()
 
-def _caller_sig():
+def _caller_signature():
     f = inspect.stack()[2]
     return f"{os.path.abspath(f.filename)}:{f.lineno}"
 
-
-def _write_lock(fd, sig, dtype, latency):
+def _encode_lock(sig, dtype, latency):
     owner = Path(sys.modules['__main__'].__file__)
     owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
-    os.write(fd, json.dumps({"caller": sig, "dtype": dtype.descr, "latency": latency, "owner": owner}).encode())
+    return json.dumps({"caller": sig, "dtype": dtype.descr, "latency": latency, "owner": owner}).encode()
 
 
 def json_descr_to_dtype(desc):
@@ -45,15 +85,14 @@ class Writer:
         shmtype, latency = datatype if isinstance(datatype, tuple) else datatype()
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
-        self._lockfile = _get_lockfile(name)
-        sig = _caller_sig()
+        sig = _caller_signature()
+        self._lock: bytes = _encode_lock(sig, shmdtype, latency)
+        assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
         try:
-            self._lock_fd = os.open(self._lockfile,
-                                    os.O_CREAT | os.O_EXCL | os.O_RDWR)
-            _write_lock(self._lock_fd, sig, shmdtype, latency)
-        except FileExistsError:
+            self._status = Status(name, self._lock)
+        except Exception as e:
             raise RuntimeError(
-                f"Writer for '{name}' exists, {self._lockfile})")
+                f"Writer for '{name}' exists @ {sig})") from e
 
         self._keeptime = keeptime
         if keeptime:
@@ -88,6 +127,7 @@ class Writer:
 
     @contextlib.contextmanager
     def buf(self):
+        self._status.update()
         self._seq.value += 1  # mark as dirty (odd)
         try:
             if self._update():
@@ -99,6 +139,7 @@ class Writer:
             Loop.keeptime()
 
     def __setitem__(self, idx, data):
+        self._status.update()
         if self._update():
             self._seq.value += 1  # odd → readers ignore
             self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
@@ -110,19 +151,16 @@ class Writer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_val, exc_tb)
-        if self._lock_fd:
+        try:
             self._shm.unlink()
-            os.close(self._lock_fd)
-        if self._lockfile:
-            os.unlink(self._lockfile)
+        except:
+            pass
         return True
 
 
 class Reader:
     def __init__(self, name, keeptime=True):
         self._name = name
-        self._lockfile = _get_lockfile(name)
-        self._lock_fd = None
         self._readable = False
         self._valid = False
         self._tlog = TimeLog(name)
@@ -131,10 +169,11 @@ class Reader:
         if keeptime:
             self._trigger = [0] # mutable counter
             Loop.init(self._trigger)
+        self._writer_lock = None
+        self._s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
 
     def __enter__(self):
         return self
-
 
     def _update(self):
         if self._keeptime:
@@ -143,25 +182,27 @@ class Reader:
             return True
 
     def ready(self):
-        if not os.path.exists(self._lockfile):
-            self._readable = False
-            if self._keeptime:
-                Loop.keeptime()
-            return self._readable
-        # wait until the writer has created the lock-file
-        if not self._readable:
-            try:
-                with open(self._lockfile, 'r') as f:
-                    lock = json.load(f)
-                    shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
-                    if self._keeptime:
-                        self._trigger[0] = 0
-                        Loop.set_ms(lock["latency"], self._trigger)
-            except:
+        try:
+            self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE, socket.MSG_DONTWAIT)
+        except BlockingIOError: # writer open
+            pass
+        except OSError: # writer closed, self._writer_lock is ""
+            pass
+        if not self._writer_lock: # enters when writer is closed
+            self._s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+            res = self._s.connect_ex(Status.name2socket(self._name))
+            if res == 0:
+                self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE)
+            else:
                 self._readable = False
                 if self._keeptime:
                     Loop.keeptime()
                 return self._readable
+            lock = json.loads(self._writer_lock)
+            shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
+            if self._keeptime:
+                self._trigger[0] = 0
+                Loop.set_ms(lock["latency"], self._trigger)
             self._readable = True
             size = shmdtype.itemsize + CACHE_LINE
             self._shm = posix_ipc.SharedMemory(self._name)
@@ -192,7 +233,7 @@ class Reader:
             s1 = self._seq[0]   # re‑read before copy
             if s1 != s0:        # writer slipped in
                 continue
-            data = self._buf[0].copy()   # 300 µs copy
+            data = self._buf[0].copy()
             if self._seq[0] == s0:       # still identical & even → success
                 return data
 
@@ -207,7 +248,5 @@ class Reader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_val, exc_tb)
-        if self._lock_fd:
-            os.unlink(self._lockfile)
-        self._tlog.close()
+        self._s.close()
         return True

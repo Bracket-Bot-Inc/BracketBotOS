@@ -1,15 +1,23 @@
+# /// script
+# dependencies = [
+#   "bbos",
+#   "rerun-sdk"
+# ]
+# [tool.uv.sources]
+# bbos = { path = "/home/bracketbot/BracketBotOS", editable = true }
+# ///
 from bbos import Reader 
-from bbos.os_utils import user_ip
-from bbos.time import Loop
-
 import time
 import rerun as rr
-import os
+import socket
+HOSTNAME = socket.gethostname()
 
 def main():
     rr.init("BracketBot Viewer", spawn=False)
     server_uri = rr.serve_grpc(grpc_port=9876, server_memory_limit="500MB")
     rr.serve_web_viewer(web_port=9090, connect_to=server_uri, open_browser=False)
+    url = f"http://{HOSTNAME}.local:9090/?url=rerun%2Bhttp://{HOSTNAME}.local:9876/proxy"
+    print("Viewer URL: ", url)
     rr.set_time("monotonic", timestamp=time.monotonic())
     with Reader("camera.jpeg") as r_jpeg,  \
          Reader("drive.ctrl") as r_ctrl,   \
@@ -20,16 +28,7 @@ def main():
          Reader("audio.speaker") as r_speak, \
          Reader("camera.points") as r_pts:
         while True:
-            if r_jpeg.ready():
-                rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
-                rr.log("/camera", rr.EncodedImage(contents=r_jpeg.data['jpeg'],media_type="image/jpeg"))
-            #if r_depth.ready():
-                #rr.set_time("monotonic", timestamp=r_depth.data['timestamp'])
-                #rr.log("/depth", rr.DepthImage(r_depth.data['depth']))
-            if r_pts.ready():
-                rr.set_time("monotonic", timestamp=r_pts.data['timestamp'])
-                rr.log("/points", rr.Points3D(r_pts.data['points'][:r_pts.data['num_points']], 
-                                              colors=r_pts.data['colors'][:r_pts.data['num_points']]))
+            if r_                                    colors=r_pts.data['colors'][:r_pts.data['num_points']]))
             if r_ctrl.ready():
                 for field in r_ctrl.data.dtype.names:
                     if field != 'timestamp':
@@ -51,9 +50,4 @@ def main():
             if r_speak.ready():
                 rr.set_time("monotonic", timestamp=r_speak.data['timestamp'])
                 rr.log("/audio/speaker", rr.Scalars(r_speak.data['audio'].mean()))
-            if r_led.ready():
-                rr.set_time("monotonic", timestamp=r_led.data['timestamp'])
-                rr.log("/led_strip", rr.Scalars(r_led.data['rgb']))
-
-if __name__ == "__main__":
-    main()
+            if r_

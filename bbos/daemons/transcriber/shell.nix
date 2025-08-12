@@ -8,6 +8,7 @@ pkgs.mkShell {
     python311.pkgs.pip
     python311Packages.numpy
     python311Packages.opencv4
+    python311Packages.scipy
     zlib
     libGL
     swig                    # required for binding generation
@@ -29,7 +30,7 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
       pip install -e ../../..
-      pip install -e /home/bracketbot/bracketbot_ai
+      pip install -e /home/bracketbot/bracketbot-ai
     else
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."

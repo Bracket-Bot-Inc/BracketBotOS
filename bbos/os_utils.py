@@ -19,7 +19,7 @@ except Exception:
 
 
 class Priority:
-    CTRL_LOW = 53
+    CTRL_LOW = 54
     CTRL_MED = 54
     CTRL_HIGH= 55
 

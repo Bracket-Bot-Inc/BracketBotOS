@@ -9,7 +9,7 @@ import time
 import math
 
 # Just blue color
-BLUE = (0, 0, 255)
+BLUE = (0,0,255)
 
 # Breathing parameters
 BREATH_DURATION = 4.0  # Duration of one complete breath cycle in seconds
@@ -24,7 +24,7 @@ def calculate_breathing_brightness(elapsed_time, duration):
     phase = (elapsed_time / duration) * 2 * math.pi
     brightness = (1 - math.cos(phase)) / 2
     # Add minimum brightness to prevent complete darkness while preserving color
-    return max(0.05, brightness)
+    return max(0.1, brightness)
 
 if __name__ == "__main__":
     CFG = Config("led_strip")

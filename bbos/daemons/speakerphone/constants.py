@@ -18,7 +18,8 @@ class speakerphone:
     mic_ms: int = 100
     speaker_chunk_size: int = speaker_sample_rate // 1000 * speaker_ms
     mic_chunk_size: int = mic_sample_rate // 1000 * mic_ms
-    volume: float = 0.3
+    mic_volume: float = 2
+    speaker_volume: float = 0.3
 
 
 # ----------------------------------------------------------------------

@@ -10,13 +10,6 @@ RATE_LIMIT_INTERVAL: float = 2.0  # seconds between app starts
 PROCESS_STOP_TIMEOUT: float = 5.0  
 CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
 
-def get_owned_locks(name):
-    for lock in Path("/tmp").glob(f"{name}_lock"):
-        with open(lock, 'r') as f:
-            if name in json.load(f)['owner']:
-                yield lock
-    return []
-
 def get_lock_path(app): return Path(f"/tmp/app-{app}_lock")
 
 def stop_app(app):

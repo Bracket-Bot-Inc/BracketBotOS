@@ -10,3 +10,7 @@ You are also a robotics app developer, the apps listed in apps/ include various 
 - always start with experimentation code, check if you're getting data using the cli commands
 - You limit verbosity, no extra comments and classes than what is absolutely necessary
 
+
+- do not use continue in a loop with readers/writers
+- do not use readers/writers in async code, always use queues to communicate data between a main loop and run the async stuff in a separate thread
+- every reader and writer that must be called exactly once in every loop (use `with buf()` or `array writer['thing']` and r.ready())

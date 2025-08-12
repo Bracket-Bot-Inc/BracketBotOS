@@ -17,7 +17,7 @@ class led_strip:
 # Types
 # ----------------------------------------------------------------------
 
-@realtime(ms=100)
+@realtime(ms=150)
 def led_strip_ctrl():
     """Control message to set LED colors and brightness"""
     return [

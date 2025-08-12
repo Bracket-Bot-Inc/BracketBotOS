@@ -1,15 +1,15 @@
-import math, struct, sys, os, time, numpy as np
+import math, struct, time, ctypes
 from pathlib import Path
-import ctypes
-from ctypes import c_long, c_int
+from ctypes import c_long
+import sys
+WHOAMI = f"{Path(sys.modules['__main__'].__file__).parent.name}__{Path(sys.modules['__main__'].__file__).name[:-3]}"
 
-librt = ctypes.CDLL("librt.so.1", use_errno=True)
-CLOCK_MONOTONIC = 1
 
 class timespec(ctypes.Structure):
     _fields_ = [("tv_sec", c_long),
                 ("tv_nsec", c_long)]
-
+librt = ctypes.CDLL("librt.so.1", use_errno=True)
+CLOCK_MONOTONIC = 1
 def ns_sleep(ns: int):
     sec = ns // 1_000_000_000
     nsec = ns % 1_000_000_000
@@ -24,12 +24,16 @@ class MovingAverage:
         self.index: int = 0
         self.count: int = 0
         self.sum: float = 0.0
+        self.sum_sq: float = 0.0
 
     def add(self, new_value: float):
         # Update the sum: subtract the value being replaced and add the new value
-        self.sum -= self.buffer[self.index]
+        old_value = self.buffer[self.index]
+        self.sum -= old_value
+        self.sum_sq -= old_value * old_value
         self.buffer[self.index] = new_value
         self.sum += new_value
+        self.sum_sq += new_value * new_value
         # Update the index in a circular manner
         self.index = (self.index + 1) % self.window_size
         # Track the number of added values (for partial windows)
@@ -43,50 +47,33 @@ class MovingAverage:
             return float('nan')
         return self.sum / self.count
 
-time_store = struct.Struct("<q")
+    def std(self) -> float:
+        if self.count == 0:
+            return float('nan')
+        if self.count == 1:
+            return 0.0
+        mean = self.avg()
+        variance = (self.sum_sq / self.count) - (mean * mean)
+        return math.sqrt(max(0.0, variance))
 
-def _get_lockfile(name):
-    pth = f"{Path(sys.modules['__main__'].__file__).parent.name}_{Path(sys.modules['__main__'].__file__).name[:-3]}"
-    return f"/tmp/{name}_{pth}_time_lock"
 
 class TimeLog:
+    time_store = struct.Struct("<qq") # avg, std
     def __init__(self, name):
+        from bbos.ipc import Status
         self._name = name
         self._buf = MovingAverage(100)
-        self._f = os.open(_get_lockfile(name),
-             os.O_WRONLY | os.O_CREAT | os.O_DSYNC,
-             0o444)
         self._last = -1
+        self._status = Status(f"{name}__{WHOAMI}__timelog")
     def log(self):
         if self._last < 0:
-            self._last = time.monotonic()
-        self._buf.add(time.monotonic()-self._last)
-        self._last = time.monotonic()
+            self._last = time.monotonic_ns()
+        self._buf.add(float(time.monotonic_ns()-self._last))
+        self._last = time.monotonic_ns()
         if self._buf.index == 0:
-            os.pwrite(self._f, time_store.pack(int(self._buf.avg()*1e9)), 0)
+            self._status.update(self.time_store.pack(int(self._buf.avg()), int(self._buf.std())))
         return self._buf.avg()
 
-    def close(self):
-        os.remove(_get_lockfile(self._name))
-
-class TimeRead: 
-    def __init__(self, name):
-        self._f = os.open(_get_lockfile(name), os.O_RDONLY)
-        self._latency = 0
-
-    def ready(self):
-        raw = os.pread(self._f, 8, 0)
-        if raw:
-            self._latency = time_store.unpack(raw)[0] * 1e-9
-            return True
-        else:
-            return False
-
-    def latency(self):
-        return self._latency
-
-    def close(self):
-        os.close(self._f)
 
 class Loop:
     _latency = 100 # ms
@@ -95,7 +82,7 @@ class Loop:
     _triggers = {}
     _num_calls = 0
     _i = 0
-    _manage_latency = True 
+    _manage_latency = True
     @staticmethod
     def keeptime():
         if Loop._i == Loop._num_calls - 1:
@@ -138,13 +125,3 @@ class Loop:
         Loop._triggers[hex(id(trigger))] = [trigger, int(ms / Loop._latency)]
         print(f"[+] Loop._latency: {Loop._latency}ms")
         print(Loop._triggers)
-
-class Realtime:
-    pri = 20
-    @staticmethod
-    def set_realtime(cores, priority):
-        if priority > Realtime.pri:
-            print(f"[+] Setting realtime priority to {priority} and cores to {cores}")
-            os.sched_setaffinity(0, cores)
-            os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(priority))
-            Realtime.pri = priority
