@@ -25,7 +25,6 @@ def infer_worker(model, in_q, out_q):
         #sf.write("chunk.wav", chunk.flatten(), CFG_SPKPN.mic_sample_rate)
         out = model(chunk.flatten())
         txt = out.text
-        print(txt)
         out_q.put(txt)
 
 def main(r_mic, w_text):
@@ -48,7 +47,6 @@ def main(r_mic, w_text):
             try:
                 in_q.put_nowait(frame)
             except queue.Full:
-                # drop oldest: clear one and reinsert (keeps capture real-time)
                 try: in_q.get_nowait()
                 except queue.Empty: pass
                 in_q.put_nowait(frame)

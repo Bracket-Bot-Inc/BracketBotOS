@@ -1,3 +1,4 @@
+# AUTO
 # /// script
 # dependencies = [
 #   "bbos",
@@ -20,7 +21,8 @@ def main():
     print("Viewer URL: ", url)
     rr.set_time("monotonic", timestamp=time.monotonic())
     with Reader("camera.jpeg") as r_jpeg,  \
-         Reader("camera.points") as r_pts:
+         Reader("camera.points") as r_pts, \
+         Reader("audio.mic") as r_mic:
         while True:
             if r_jpeg.ready():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
@@ -29,5 +31,8 @@ def main():
                 rr.set_time("monotonic", timestamp=r_pts.data['timestamp'])
                 rr.log("/points", rr.Points3D(r_pts.data['points'][:r_pts.data['num_points']], 
                                               colors=r_pts.data['colors'][:r_pts.data['num_points']]))
+            if r_mic.ready():
+                rr.set_time("monotonic", timestamp=r_mic.data['timestamp'])
+                rr.log("/audio/mic", rr.Scalars(r_mic.data['audio'].mean()))
 if __name__ == "__main__":
     main()

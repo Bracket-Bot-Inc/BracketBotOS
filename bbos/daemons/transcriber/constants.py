@@ -19,5 +19,5 @@ class transcriber:
 @realtime(ms=100)
 def transcriber_text():
     return [
-        ("text", f"S{transcriber.sequence_length}")
+        ("text", f"U{transcriber.sequence_length}")
     ]

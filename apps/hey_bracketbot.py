@@ -1,3 +1,4 @@
+# AUTO
 # /// script
 # dependencies = [
 #   "bbos",
@@ -47,7 +48,6 @@ def detect_wake_word(text, match_words, weights):
         max_score = max(max_score, score)
     
     # Threshold for detection (tune this based on testing)
-    print(max_score)
     return max_score > 0.55
 
 def main():

@@ -105,13 +105,10 @@ def main():
                         forward_speed = -MIN_FORWARD_SPEED - (MAX_FORWARD_SPEED - MIN_FORWARD_SPEED) * speed_multiplier * 0.5
                 if abs(x_error) < CENTER_THRESHOLD:
                     cmd[:] = [forward_speed, 0]  # Note: negative sign to match robot's convention
-                    print(f"Going FORWARD: speed = {forward_speed:.2f}")
                 elif x_error > 0:
                     cmd[:] = [forward_speed, TURN_SPEED*abs(x_error)]  # Note: negative sign
-                    print(f"Going RIGHT: speed = {forward_speed:.2f}")
                 else:
                     cmd[:] = [forward_speed, -TURN_SPEED*abs(x_error)]  # Note: negative sign
-                    print(f"Going BACKWARD: speed = {forward_speed:.2f}")
             with w_ctrl.buf() as b:
                 b['twist'] = cmd
 
