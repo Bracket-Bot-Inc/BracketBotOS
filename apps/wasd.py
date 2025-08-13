@@ -1,8 +1,10 @@
 # /// script
 # dependencies = [
+#   "bbos",
 #   "sshkeyboard",
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 # ]
+# [tool.uv.sources]
+# bbos = { path = "/home/bracketbot/BracketBotOS", editable = true }
 # ///
 from bbos import Writer, Type
 from sshkeyboard import listen_keyboard, stop_listening

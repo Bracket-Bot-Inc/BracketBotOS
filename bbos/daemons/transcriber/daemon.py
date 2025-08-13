@@ -1,7 +1,7 @@
 from bbos import Reader, Writer, Type, Config
 from bracketbot_ai import Transcriber
 import numpy as np, threading, queue, time
-import soundfile as sf
+#import soundfile as sf
 
 CFG_SPKPN = Config('speakerphone')
 CFG_TRNS  = Config('transcriber')

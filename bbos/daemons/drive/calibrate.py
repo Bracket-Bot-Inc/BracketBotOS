@@ -142,7 +142,7 @@ def calibrate_axis(odrv0, axis):
     getattr(odrv0, f'axis{axis}').clear_errors()
 
     # Wait for a moment to ensure errors are cleared
-    time.sleep(1)
+    time.sleep(4)
 
     # Print current errors to verify they're cleared
     axis_error = getattr(odrv0, f'axis{axis}').error

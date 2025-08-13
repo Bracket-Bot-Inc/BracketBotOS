@@ -1,0 +1,38 @@
+---
+alwaysApply: true
+---
+
+- This operating system is DietPi
+- This operating system is running on an Orange Pi 5 Pro single board computer
+- This single board computer is part of a DIY robot kit called Bracket Bot
+
+- The software that controls this robot is in @BracketBotOS
+- It has core daemons that interface directly with hardware such as camera, odrive, led strip, and speakerphone.
+- Unless explicitly mentioned, agent should never attempt to stop or start the python processes that are running these daemons. They are controlled by @BracketBotOS/bbos/app_manager.py
+
+- to debug the BracketBotOS system, use the same commands the user would:
+    - 'restart' restarts all the daemons, used when something strange is occuring, or a modification occurs to anything in BracketBotOS to ensure up to date code is running
+    - 'stop' will stop all daemons, 'stop <daemonname>' will stop a specific daemon
+    - 'timing' will print the looprate of the daemons
+    - 'list' will print the running daemons
+    - 'debug-daemons' will print the logs of each daemon
+
+- The user is meant to write apps ontop of BracketBotOS
+- There are example apps in @BracketBotOS/apps that show how to use the system. There are correct ways to interface with the daemons.
+- users should not be writing code that directly interfaces with hardware, data used in apps should be acquired by daemons Writers and Readers.
+
+## How BracketBotOS works
+- BracketBotOS is written in Python, and uses uv as its package manager
+- BracketBotOS is an operating system for robots
+- Daemons interface with hardware or do other always on tasks
+- Daemons use Nix to have reproducible runtimes, do not edit the nix
+- Daemons use a custom shared memory implementation in @BracketBotOS/bbos/shm.py
+- Daemons use Writers and Readers to work with information
+- Apps should always be using Reader and Writers, and not interfacing directly with hardware
+- Apps can be single files, which use PEP723 to specify the dependancies at the top of the file, or they can be folders which can contain multiple files, but always atleast and only one main.py which acts as the entry point for the app
+- 
+
+
+## Hard rules
+- Do not use system python for anything, ever.
+- If you must test something, use or make a folder in the home directory, and create a new environment for this testing.

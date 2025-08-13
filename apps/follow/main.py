@@ -1,10 +1,12 @@
 # /// script
 # dependencies = [
 #   "ultralytics",
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
 #   "turbojpeg-rpi",
 #   "openvino",
+#   "bbos",
 # ]
+# [tool.uv.sources]
+# bbos = { path = "/home/bracketbot/BracketBotOS", editable = true }
 # ///
 from bbos import Config, Reader, Writer, Type
 import os, time
@@ -45,6 +47,7 @@ def main():
     cmd = np.zeros(2)
     CFG = Config("stereo")
     img_width = CFG.width // 2
+    print("img_width", img_width)
     with Reader("camera.jpeg") as r_jpeg, \
         Writer("drive.ctrl", Type("drive_ctrl")) as w_ctrl:
         while True:

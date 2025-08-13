@@ -23,6 +23,7 @@ def main():
     with Reader("camera.jpeg") as r_jpeg,  \
          Reader("camera.points") as r_pts, \
          Reader("audio.mic") as r_mic:
+         Reader("drive.ctrl") as r_ctrl:
         while True:
             if r_jpeg.ready():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
@@ -34,5 +35,10 @@ def main():
             if r_mic.ready():
                 rr.set_time("monotonic", timestamp=r_mic.data['timestamp'])
                 rr.log("/audio/mic", rr.Scalars(r_mic.data['audio'].mean()))
+            if r_ctrl.ready():
+                for field in r_ctrl.data.dtype.names:
+                    if field != 'timestamp':
+                        rr.set_time("monotonic", timestamp=r_ctrl.data['timestamp'])
+                        rr.log(f"/drive/ctrl/{field}", rr.Scalars(r_ctrl.data[field]))
 if __name__ == "__main__":
     main()
