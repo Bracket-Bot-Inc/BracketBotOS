@@ -67,6 +67,8 @@ class ManagedProc:
         if not self.proc or self.proc.exitcode is not None:
             if self.proc and self.proc.exitcode != 0:
                 print(f"[manager] {self.name} exited ({self.proc.exitcode})")
+                self.start()
+                print(f"[manager] {self.name} restarted")
 
 
 def discover_daemons(root: Path):
@@ -86,7 +88,6 @@ def main():
     print(f"Managing daemons: {', '.join(p.name for p in procs)}")
 
     running = True
-
     def shutdown(signum, _):
         nonlocal running
         print(f"\n[manager] signal {signum}, shutting down…")
