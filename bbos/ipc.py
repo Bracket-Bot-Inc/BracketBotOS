@@ -7,13 +7,18 @@ import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit,
 import numpy as np
 from pathlib import Path
 
+
 class Status:
     PAYLOAD_SIZE = 4096
     def __init__(self, name: str, data: bytes = None):
         self._sock = self.name2socket(name)
         self._data = data
         self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-        self._srv.bind(self._sock)
+        try:
+            self._srv.bind(self._sock)
+        except RuntimeError as e:
+            self._srv.close()
+            raise RuntimeError(f"Error: {name} already exists, only one Writer allowed per name!") from e
         self._srv.listen()
         self._srv.setblocking(False)
         self._sel = selectors.DefaultSelector()
@@ -40,7 +45,9 @@ class Status:
                     if not data:
                         remove.add(c)
                 except BlockingIOError:
-                    pass 
+                    pass
+                except OSError:
+                    remove.add(c)
             self._clients -= remove
         except Exception as e:
             print(e)
@@ -192,7 +199,13 @@ class Reader:
             self._s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
             res = self._s.connect_ex(Status.name2socket(self._name))
             if res == 0:
-                self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE)
+                try: # antipattern: remove all these try catches
+                    self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE)
+                except OSError:
+                    self._readable = False
+                    if self._keeptime:
+                        Loop.keeptime()
+                    return self._readable
             else:
                 self._readable = False
                 if self._keeptime:
