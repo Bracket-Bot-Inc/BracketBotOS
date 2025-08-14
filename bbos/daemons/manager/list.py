@@ -21,14 +21,30 @@ sockets = result.stdout.splitlines()
 writers = {sock.split("__")[0].replace(".bbos", "") for sock in sockets}
 reader_data = {w: [] for w in writers}
 writer_data = {}
-for sock in sockets:
+
+import concurrent.futures
+
+def process_socket(sock):
     w = sock.split("__")[0].replace(".bbos", "")
     if "timelog" in sock:
         reader = f"{sock.split('__')[2]}/{sock.split('__')[1]}"
-        reader_data[w].append((reader, get_data(sock)))
+        return ("timelog", w, reader, get_data(sock))
     else:
         data = get_data(sock)
-        writer_data[w] = json.loads(data) if data else None
+        return ("writer", w, json.loads(data) if data else None)
+
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    results = list(executor.map(process_socket, sockets))
+
+for result in results:
+    if result[0] == "timelog":
+        _, w, reader, data = result
+        reader_data[w].append((reader, data))
+    else:
+        _, w, data = result
+        writer_data[w] = data
+
+print(reader_data)
 
 for writer, info in writer_data.items():
     print(f"Writer : {writer}")
