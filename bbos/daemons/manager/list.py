@@ -44,8 +44,6 @@ for result in results:
         _, w, data = result
         writer_data[w] = data
 
-print(reader_data)
-
 for writer, info in writer_data.items():
     print(f"Writer : {writer}")
     if not info:
