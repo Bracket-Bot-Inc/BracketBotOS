@@ -1,8 +1,12 @@
 # /// script
 # dependencies = [
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
-#   "soundfile"          # lightweight, perfect for streamed WAV output
+#   "ultralytics",
+#   "turbojpeg-rpi",
+#   "openvino",
+#   "bbos",
 # ]
+# [tool.uv.sources]
+# bbos = { path = "/home/bracketbot/BracketBotOS", editable = true }
 # ///
 import numpy as np
 import soundfile as sf

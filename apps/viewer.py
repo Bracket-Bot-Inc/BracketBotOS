@@ -22,7 +22,7 @@ def main():
     rr.set_time("monotonic", timestamp=time.monotonic())
     with Reader("camera.jpeg") as r_jpeg,  \
          Reader("camera.points") as r_pts, \
-         Reader("audio.mic") as r_mic:
+         Reader("audio.mic") as r_mic, \
          Reader("drive.ctrl") as r_ctrl:
         while True:
             if r_jpeg.ready():

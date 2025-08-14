@@ -3,8 +3,10 @@
 #   "fastapi",
 #   "uvicorn",
 #   "wsproto",
-#   "bbos @ /home/bracketbot/BracketBotOS/dist/bbos-0.0.1-py3-none-any.whl",
+#   "bbos",
 # ]
+# [tool.uv.sources]
+# bbos = { path = "/home/bracketbot/BracketBotOS", editable = true }
 # ///
 from bbos import Reader, Writer, Type
 
