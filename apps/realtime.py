@@ -83,9 +83,12 @@ class WebRTCManager:
     STREAM_URL = f"{API_BASE}/realtime"
 
     def __init__(self, model, mic_track, speaker):
-        load_dotenv()
+        print("Loading .env")
+        print(os.getcwd())
+        load_dotenv(dotenv_path=".env")
+
         api_key = os.getenv("OPENAI_API_KEY")
-        assert api_key,print("OPENAI_API_KEY missing in environment")
+        assert api_key, print("OPENAI_API_KEY missing in environment")
         system_prompt = os.getenv("OPENAI_SYSTEM_PROMPT", 
                                 "Say hello and introduce yourself as BracketBot. Always respond in English. You are currently being built by Brian and Raghava at Steinmetz Engineering.")  
         self.api_key = api_key

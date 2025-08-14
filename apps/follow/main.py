@@ -30,7 +30,7 @@ MODEL_PATH = "yolov8n.pt"
 OPENVINO_MODEL_PATH = "yolov8n_openvino_model"  # Not used anymore
 
 # Speed control parameters
-MAX_FORWARD_SPEED = 2 # Maximum speed when person is far
+MAX_FORWARD_SPEED = 3.5 # Maximum speed when person is far
 MIN_FORWARD_SPEED = 0.05  # Minimum speed when person is close
 SPEED_SCALE_FACTOR = 1  # How aggressively speed changes with distance
 

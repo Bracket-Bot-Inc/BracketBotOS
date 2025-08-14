@@ -59,12 +59,18 @@ def main():
             if r_transcript.ready():
                 text = r_transcript.data['text']
                 if text:
-                    if detect_wake_word(text, ["follow"], [1]):
+                    if detect_wake_word(text, ["follow"], [0.7]):
                         start_app("follow")
                         color = [0, 255, 0]
-                    if detect_wake_word(text, ["stop"], [1]):
+                    if detect_wake_word(text, ["stop"], [0.7]):
                         stop_app("follow")
                         color = [255, 0, 0]
+                    if detect_wake_word(text, ["talk"], [0.7]):
+                        start_app("realtime")
+                        color = [255, 0, 255]
+                    if detect_wake_word(text, ["quiet"], [0.7]):
+                        stop_app("realtime")
+                        color = [0, 0, 0]
             rgb_array[:, :] = color
             w_led_strip["rgb"] = rgb_array
     stop_app("follow")
