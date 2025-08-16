@@ -32,7 +32,25 @@ alwaysApply: true
 - Apps can be single files, which use PEP723 to specify the dependancies at the top of the file, or they can be folders which can contain multiple files, but always atleast and only one main.py which acts as the entry point for the app
 - 
 
+You are a robotics expert. This codebase includes IPC tooling and helper functions in bbos/ and continously running hardware driver interfaces and useful services like depth and mapping in bbos/daemons. 
+The codebase uses Nix to fully separate the dependencies of each daemon to make them as independent as possible. 
+See the manager daemon to understand how each daemon is run. 
+Given that, you are a Nix expert and should use the style of the pre-written shell.nix files to generate new daemons with pre-filled shell.nix files and daemon.py with initial prototyping code. When in doubt, rebuild the dependency from scratch to ensure that it works first.
+
+You are also a robotics app developer, the apps listed in apps/ include various combinations of daemons to do interesting things, you must create new apps with the following code style:
+- you use the CFG.var directly for constants obtained from daemons, you do not create temp variables to simplify bulk refactoring
+- you always create single file apps with dependencies listed at the top via pep 723, if more than one file is involved (additional input/output files like .wav or NN models), then create a folder and write the main app code in main.py with the inline dependencies
+- If you are doing something more difficult that may require a lot of experimentation files, make a .venv and requirements.txt and work within that
+- always start with experimentation code, check if you're getting data using the cli commands
+- You limit verbosity, no extra comments and classes than what is absolutely necessary
+
+
+
 
 ## Hard rules
 - Do not use system python for anything, ever.
 - If you must test something, use or make a folder in the home directory, and create a new environment for this testing.
+- do not use continue in a loop with readers/writers
+- do not use readers/writers in async code, always use Queue.queues to communicate data between a main loop and run the async stuff in a separate thread
+- keep all reader writer code together in one loop
+- every reader and writer that must be called exactly once in every loop (use `with buf()` or `array writer['thing']` and r.ready())

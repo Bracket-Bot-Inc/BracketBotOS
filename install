@@ -50,6 +50,14 @@ def check_and_install_nix():
     os.execvp("bash",
               ["bash", "-l", "-c", f"_NIX_INSTALLED=1 uv run {__file__}"])
 
+def check_and_install_cursorrules():
+    if (BRACKETBOT_DIR.parent / ".cursor").exists():
+        print("[+] cursor rules is already installed.")
+        return
+    print("[*] Installing cursorrules...")
+    os.makedirs(BRACKETBOT_DIR.parent / ".cursor", exist_ok=True)
+    shutil.copytree(BRACKETBOT_DIR / ".cursor", BRACKETBOT_DIR.parent / ".cursor")
+    print("[!] cursor rules installation complete.")
 
 def check_and_install_uv():
     if shutil.which("uv"):
@@ -130,6 +138,7 @@ def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
 def main():
     check_and_install_uv()
     check_and_install_nix()
+    check_and_install_cursorrules()
 
     add_to_PATH = []
     # build
