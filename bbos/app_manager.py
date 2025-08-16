@@ -59,7 +59,6 @@ class AppManager:
                     break
                 line_stripped = line.strip()
                 if line_stripped.startswith("#AUTO") or line_stripped.startswith("# AUTO"):
-                    print(f"[autostart] Found autostart app: {file.parent.name}/{file.stem}") 
                     return True
             else:
                 return False
@@ -104,14 +103,13 @@ class AppManager:
     # ── dashboard/stop side ───────────────────────────────────────────────
     def _stop_app(self, app, timeout=PROCESS_STOP_TIMEOUT):
         if self.is_app_running(app):
-            if app in self.processes:
-                p = self.processes[app]
-                os.killpg(p.pid, signal.SIGINT)                 # ② INT the whole group
-                p.join(timeout)
-                if p.is_alive():
-                    p.terminate(); p.join(2)                    # escalate → TERM/KILL
-                del self.processes[app]
-        return True
+            p = self.processes[app]
+            os.killpg(p.pid, signal.SIGTERM)                 # ② INT the whole group
+            p.join(timeout)
+            if p.is_alive():
+                p.terminate(); p.join(2)                    # escalate → TERM/KILL
+            del self.processes[app]
+        return stop_app(app)
 
 
     def _start_app(self, app_name: str) -> bool:
@@ -127,15 +125,15 @@ class AppManager:
             ctx  = mp.get_context("fork")         # optional – keeps code explicit
             proc = ctx.Process(target=self._launch_app, args=(app_name,),
                               name=app_name)
-            print(f"[dashboard] Starting ")
+            print(f"[app-manager] Starting {app_name}")
             proc.start()
             self.processes[app_name] = proc
             self.last_start[app_name] = time.time()
-            print(f"[dashboard] Started app: {app_name} (pid={proc.pid})")
+            print(f"[app-manager] Started app: {app_name} (pid={proc.pid})")
             return True
             
         except Exception as e:
-            print(f"[dashboard] Failed to start {app_name}: {e}")
+            print(f"[app-manager] Failed to start {app_name}: {e}")
             return False
     
     def start(self):
@@ -146,12 +144,16 @@ class AppManager:
         try:
             while True:
                 for app in self.get_available_apps():
+                    print(app, get_lock_path(app).exists(), app in self.processes, self.processes[app].is_alive() if app in self.processes else None)
                     if not get_lock_path(app).exists() and app in self.processes:
                         print(f"[app-manager] Detected external delete of {app}_lock. Terminating.")
                         self._stop_app(app)
                     if get_lock_path(app).exists() and app not in self.processes:
                         print(f"[app-manager] Detected external creation of {app}_lock. Starting.")
                         self._start_app(app)
+                    if app in self.processes and not self.processes[app].is_alive():
+                        print(f"[app-manager] Detected external termination of {app}. Terminating.")
+                        self._stop_app(app)
                     time.sleep(0.05)
         except KeyboardInterrupt:
             self.stop_all()
