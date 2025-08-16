@@ -16,9 +16,18 @@ class Status:
         self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
         try:
             self._srv.bind(self._sock)
-        except RuntimeError as e:
+        except OSError as e:
+            res = self._srv.connect_ex(self._sock)
+            self._srv.settimeout(0.1)
+            if res == 0:
+                try:
+                    data = self._srv.recv(1024)
+                    details = json.loads(data)
+                    print(f"Writer for {name} already exists @ {details['caller']}", flush=True)
+                except socket.timeout:
+                    pass
             self._srv.close()
-            raise RuntimeError(f"Error: {name} already exists, only one Writer allowed per name!") from e
+            sys.exit(1)
         self._srv.listen()
         self._srv.setblocking(False)
         self._sel = selectors.DefaultSelector()
@@ -51,11 +60,6 @@ class Status:
             self._clients -= remove
         except Exception as e:
             print(e)
-    def __del__(self):
-        for c in self._clients:
-            c.close()
-        self._srv.close()
-        self._sel.close()
 
 def _caller_signature():
     f = inspect.stack()[2]
@@ -95,11 +99,7 @@ class Writer:
         sig = _caller_signature()
         self._lock: bytes = _encode_lock(sig, shmdtype, latency)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
-        try:
-            self._status = Status(name, self._lock)
-        except Exception as e:
-            raise RuntimeError(
-                f"Writer for '{name}' exists @ {sig})") from e
+        self._status = Status(name, self._lock)
 
         self._keeptime = keeptime
         if keeptime:
