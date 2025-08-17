@@ -59,10 +59,10 @@ def setup_vscode():
     print("[*] Setting up vscode settings in ~/.vscode/settings.json...")
     settings_json = {
         "search.exclude": {
-            "**/.*": True
+            ".*": True
         },
         "files.exclude": {
-            "**/.*": True
+            ".*": True
         }
     }
     settings_file = Path.home() / ".vscode" / "settings.json"
