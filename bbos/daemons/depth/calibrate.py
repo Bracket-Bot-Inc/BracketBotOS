@@ -52,8 +52,9 @@ BOLD = '\033[1m'
 RESET = '\033[0m'
 
 # Configuration
+TOTAL_SQUARES = 12
 CHECKERBOARD = (5, 5)
-SQUARE_SIZE = 83.97 # mm
+square_mm = 83.97 # mm
 
 PORT = 8082
 
@@ -78,7 +79,7 @@ def load_calibration_yaml(filepath):
         dict: Dictionary containing K1, D1, K2, D2 matrices if successful, None otherwise
     """
     try:
-        print(f"[INFO] Loading bootstrap calibration from: {filepath}")
+        #print(f"[INFO] Loading bootstrap calibration from: {filepath}")
         
         # Use OpenCV FileStorage to read the YAML (same format as write_calib_yaml)
         fs = cv2.FileStorage(filepath, cv2.FILE_STORAGE_READ)
@@ -1128,15 +1129,87 @@ def create_handler(calibrator):
     
     return Handler
 
+def screen_calibration(squares: int):
+    import sys, fcntl, termios, struct
+    if squares < 2:
+        raise ValueError("squares_per_side must be >= 2")
+
+    # terminal size (rows, cols)
+    s = struct.pack("HHHH", 0, 0, 0, 0)
+    rows, cols, _, _ = struct.unpack("HHHH", fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, s))
+    print(f"{rows}  {cols}")
+
+    cal_block_w = rows // squares
+    cal_block_h = cols // squares
+    cal_block_w = min(cal_block_w, cal_block_h)
+    cal_block_h = cal_block_w
+
+    pad_top = (rows - cal_block_h) // 2
+    pad_left = (cols - cal_block_w) // 2
+
+    # clear screen
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+
+    for _ in range(pad_top):
+        print()
+
+    for _ in range(cal_block_h):
+        for _ in range(2):
+            sys.stdout.write(" " * pad_left)
+            for _ in range(cal_block_w):
+                sys.stdout.write("██")
+            sys.stdout.write("\n")
+    sys.stdout.flush()
+
+    measured_mm_w = float(input("\n\nWidth in mm: "))
+    measured_mm_h = float(input("Height in mm: "))
+
+    char_mm_w = measured_mm_w / cal_block_w
+    char_mm_h = measured_mm_h / cal_block_h
+
+    max_square_cols = cols // squares
+    max_square_rows = rows // squares
+
+    square_mm_w = max_square_cols * char_mm_w
+    square_mm_h = max_square_rows * char_mm_h
+    square_mm = min(square_mm_w, square_mm_h)
+
+    square_cols = int(square_mm / char_mm_w)
+    square_rows = int(square_mm / char_mm_h)
+
+    print(f"{square_mm:.2f} {square_cols} {square_rows}")
+    return square_mm, square_cols, square_rows
+
+def draw_checker(squares: int, square_cols: int, square_rows: int):
+    if squares < 2:
+        raise ValueError("squares_per_side must be >= 2")
+
+    BLACK = "█"
+    WHITE = " "
+
+    # Clear screen before drawing grid
+    sys.stdout.write("\033[2J\033[H")
+    sys.stdout.flush()
+
+    for gy in range(squares):
+        for _ in range(square_rows):
+            line = []
+            for gx in range(squares):
+                cell = BLACK if ((gx + gy) % 2 == 0) else WHITE
+                if gx == 0 or gy == 0 or gx == squares - 1 or gy == squares - 1:
+                    cell = BLACK
+                line.append(cell * square_cols)
+            sys.stdout.write("".join(line) + "\n")
+    sys.stdout.flush()
+
+
+
 def main():
     service_was_running = False
     cap = None
     
     try:
-        print(f"\n{BOLD}Camera Calibration Tool{RESET}")
-        print("This script will calibrate your stereo camera setup using a checkerboard pattern.")
-        print(f"Checkerboard size: {CHECKERBOARD[0]}x{CHECKERBOARD[1]} squares")
-        print(f"Square size: {SQUARE_SIZE}mm")
         
         # Load bootstrap calibration (default: stereo_calib.yaml)
         bootstrap_calib = None
@@ -1167,8 +1240,13 @@ def main():
         capture_thread.start()
         
         # Start HTTP server
-        handler = create_handler(calibrator)
-        httpd = HTTPServer(('0.0.0.0', PORT), handler)
+        def server_loop():
+            handler = create_handler(calibrator)
+            httpd = HTTPServer(('0.0.0.0', PORT), handler)
+            httpd.serve_forever()
+        
+        server_thread = threading.Thread(target=server_loop, daemon=True)
+        server_thread.start()
         
         local_ip = get_local_ip()
         print(f"\n{GREEN}Calibration web interface started!{RESET}")
@@ -1176,8 +1254,19 @@ def main():
         print(f"   http://{local_ip}:{PORT}")
         print(f"   http://localhost:{PORT}")
         print(f"\n✨ Press Ctrl+C to stop calibration\n")
-        
-        httpd.serve_forever()
+
+        print("SCREEN CALIBRATION")
+        print(f"{GREEN}INSTRUCTIONS: A calibration square will be loaded within this terminal after following these instructions. \n\
+        1. Minimize the terminal window by pressing `CMD/CTRL -` \n\
+        2. You will then be prompted with the WIDTH, then the HEIGHT in mm of a calibration square. \n\
+        3. Measure the square with a ruler (or ideally a caliper) and enter the values one after the other and hit enter for each value.{RESET}")
+        print(f"{GREEN}Press ENTER key to load the calibration square...{RESET}")
+        input()
+        square_mm, square_cols, square_rows = screen_calibration(TOTAL_SQUARES)
+        draw_checker(TOTAL_SQUARES, square_cols, square_rows)
+        print("Square size: ", square_mm)
+        print("Press Enter to exit...")
+        input()
         
     except KeyboardInterrupt:
         print(f"\n{YELLOW}Calibration interrupted by user.{RESET}")
