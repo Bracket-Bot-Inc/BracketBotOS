@@ -28,8 +28,9 @@ def main():
                 rr.set_time("monotonic", timestamp=r_jpeg.data['timestamp'])
                 rr.log("/camera", rr.EncodedImage(contents=r_jpeg.data['jpeg'],media_type="image/jpeg"))
             if r_pts.ready():
+                rr.log("/", rr.ViewCoordinates.RIGHT_HAND_Y_DOWN, static=True)
                 rr.set_time("monotonic", timestamp=r_pts.data['timestamp'])
-                rr.log("/points", rr.Points3D(r_pts.data['points'][:r_pts.data['num_points']], 
+                rr.log("/camera.points", rr.Points3D(r_pts.data['points'][:r_pts.data['num_points']], 
                                               colors=r_pts.data['colors'][:r_pts.data['num_points']]))
             if r_mic.ready():
                 rr.set_time("monotonic", timestamp=r_mic.data['timestamp'])
