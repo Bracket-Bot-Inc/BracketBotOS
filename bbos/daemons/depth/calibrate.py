@@ -67,7 +67,6 @@ IMG_DIR = CALIB_DIR
 # Ensure directories exist
 os.makedirs(CALIB_DIR, exist_ok=True)
 
-
 # --- BOOTSTRAP CALIBRATION UTILS ---
 def load_calibration_yaml(filepath):
     """Load camera matrices and distortion coefficients from a YAML file.
@@ -1206,11 +1205,7 @@ def draw_checker(squares: int, square_cols: int, square_rows: int):
 
 
 def main():
-    service_was_running = False
-    cap = None
-    
     try:
-        
         # Load bootstrap calibration (default: stereo_calib.yaml)
         bootstrap_calib = None
         if os.path.exists(INIT_CALIB_YAML_PATH):
@@ -1252,7 +1247,7 @@ def main():
         print(f"\n{GREEN}Calibration web interface started!{RESET}")
         print(f"📱 Open your web browser and go to:")
         print(f"   http://{local_ip}:{PORT}")
-        print(f"   http://localhost:{PORT}")
+        print(f"   http://{socket.gethostname()}:{PORT}")
         print(f"\n✨ Press Ctrl+C to stop calibration\n")
 
         print("SCREEN CALIBRATION")
