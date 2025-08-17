@@ -53,33 +53,34 @@ class AppManager:
 
     def get_available_apps(self) -> List[str]:
         """Get list of available apps from APPS_PATH"""
-        def is_autostart(file: Path) -> bool:
-            for i, line in enumerate(file.read_text().splitlines()):
-                if i > 3:  # Only check first 10 lines
-                    break
-                line_stripped = line.strip()
-                if line_stripped.startswith("#AUTO") or line_stripped.startswith("# AUTO"):
-                    return True
-            else:
-                return False
+        def is_autostart(app_name: str) -> bool:
+            for app_dir in self.app_dirs:
+                autostart_file = app_dir / ".autostart"
+                if autostart_file.exists():
+                    for line in autostart_file.read_text().splitlines():
+                        if line.strip() == app_name:
+                            return True
+            return False
         apps = []
         for app_dir in self.app_dirs:
             # Check for .py files
             for app_file in app_dir.glob("*.py"):
-                apps.append(app_file.stem)
-                self.app_paths[app_file.stem] = app_file.absolute()
-                if is_autostart(app_file):
-                    self.autostart.append(app_file.stem)
+                app_name = app_file.stem
+                apps.append(app_name)
+                self.app_paths[app_name] = app_file.absolute()
+                if is_autostart(app_name):
+                    self.autostart.append(app_name)
             
             # Check for folders with main.py
             for folder in app_dir.iterdir():
+                app_name = folder.name
                 if folder.is_dir():
                     main_file = folder / "main.py"
                     if main_file.exists():
-                        apps.append(folder.name)
-                        self.app_paths[folder.name] = main_file.absolute()
-                        if is_autostart(main_file):
-                            self.autostart.append(folder.name)
+                        apps.append(app_name)
+                        self.app_paths[app_name] = main_file.absolute()
+                        if is_autostart(app_name):
+                            self.autostart.append(app_name)
         with open(f"/tmp/app-manager_lock", "w") as fd:
             json.dump({k: str(v.absolute()) for k, v in self.app_paths.items()}, fd)
         return apps
@@ -144,7 +145,6 @@ class AppManager:
         try:
             while True:
                 for app in self.get_available_apps():
-                    print(app, get_lock_path(app).exists(), app in self.processes, self.processes[app].is_alive() if app in self.processes else None)
                     if not get_lock_path(app).exists() and app in self.processes:
                         print(f"[app-manager] Detected external delete of {app}_lock. Terminating.")
                         self._stop_app(app)

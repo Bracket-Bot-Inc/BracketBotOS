@@ -1,4 +1,3 @@
-# AUTO
 # /// script
 # dependencies = [
 #   "bbos",
