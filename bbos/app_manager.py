@@ -86,6 +86,7 @@ class AppManager:
         return apps
     
     def is_app_running(self, app: str) -> bool:
+        print(f"is app {app} alive: ", self.processes[app].is_alive() if app in self.processes else None, flush=True)
         return app in self.processes and self.processes[app].is_alive()
 
    # ── dashboard/launch side ─────────────────────────────────────────────
@@ -109,7 +110,7 @@ class AppManager:
             p.join(timeout)
             if p.is_alive():
                 p.terminate(); p.join(2)                    # escalate → TERM/KILL
-            del self.processes[app]
+        del self.processes[app]
         return stop_app(app)
 
 
