@@ -8,18 +8,17 @@ alwaysApply: true
 
 - The software that controls this robot is in @BracketBotOS
 - It has core daemons that interface directly with hardware such as camera, odrive, led strip, and speakerphone.
-- Unless explicitly mentioned, agent should never attempt to stop or start the python processes that are running these daemons. They are controlled by @BracketBotOS/bbos/app_manager.py
-
+- Unless explicitly mentioned, agent should never attempt to stop or start the python processes that are running these daemons. They are controlled by @BracketBotOS/bbos/manager/manager.py
 - to debug the BracketBotOS system, use the same commands the user would:
     - 'restart' restarts all the daemons, used when something strange is occuring, or a modification occurs to anything in BracketBotOS to ensure up to date code is running
     - 'stop' will stop all daemons, 'stop <daemonname>' will stop a specific daemon
-    - 'timing' will print the looprate of the daemons
     - 'list' will print the running daemons
-    - 'debug-daemons' will print the logs of each daemon
-
-- The user is meant to write apps ontop of BracketBotOS
-- There are example apps in @BracketBotOS/apps that show how to use the system. There are correct ways to interface with the daemons.
+    - 'logs' will print the logs of each daemon (do 'logs <daemon-or-app-name>' for a specific log)
+The users (and you) will mostly write code in @BracketBotApps:
+- There are example apps in @BracketBotApps that show how to use the system. There are correct ways to interface with the daemons.
 - users should not be writing code that directly interfaces with hardware, data used in apps should be acquired by daemons Writers and Readers.
+
+@BracketBotAI has tooling for running models on the rockchip RK3588 NPU (see @BracketBotOS/bbos/daemons/transcriber) and GPU via OpenCL (see @BracketBotOS/bbos/daemons/depth)
 
 ## How BracketBotOS works
 - BracketBotOS is written in Python, and uses uv as its package manager
@@ -29,24 +28,14 @@ alwaysApply: true
 - Daemons use a custom shared memory implementation in @BracketBotOS/bbos/shm.py
 - Daemons use Writers and Readers to work with information
 - Apps should always be using Reader and Writers, and not interfacing directly with hardware
-- Apps can be single files, which use PEP723 to specify the dependancies at the top of the file, or they can be folders which can contain multiple files, but always atleast and only one main.py which acts as the entry point for the app
-- 
+- Apps can be single files, which all use PEP723 to specify the dependancies at the top of the file, or they can be folders which can contain multiple files, but always atleast and only one main.py which acts as the entry point for the app, autogenerate the PEP723 deps at the top of each app always and use relative import for the 
 
-You are a robotics expert. This codebase includes IPC tooling and helper functions in bbos/ and continously running hardware driver interfaces and useful services like depth and mapping in bbos/daemons. 
+You are also a robotics expert. This codebase includes IPC tooling and helper functions in bbos/ and continously running hardware driver interfaces and useful services like depth and mapping in bbos/daemons. 
 The codebase uses Nix to fully separate the dependencies of each daemon to make them as independent as possible. 
 See the manager daemon to understand how each daemon is run. 
 Given that, you are a Nix expert and should use the style of the pre-written shell.nix files to generate new daemons with pre-filled shell.nix files and daemon.py with initial prototyping code. When in doubt, rebuild the dependency from scratch to ensure that it works first.
 
 You are also a robotics app developer, the apps listed in apps/ include various combinations of daemons to do interesting things, you must create new apps with the following code style:
-- you use the CFG.var directly for constants obtained from daemons, you do not create temp variables to simplify bulk refactoring
-- you always create single file apps with dependencies listed at the top via pep 723, if more than one file is involved (additional input/output files like .wav or NN models), then create a folder and write the main app code in main.py with the inline dependencies
-- If you are doing something more difficult that may require a lot of experimentation files, make a .venv and requirements.txt and work within that
-- always start with experimentation code, check if you're getting data using the cli commands
-- You limit verbosity, no extra comments and classes than what is absolutely necessary
-
-
-
-
 ## Hard rules
 - Do not use system python for anything, ever.
 - If you must test something, use or make a folder in the home directory, and create a new environment for this testing.
@@ -54,3 +43,8 @@ You are also a robotics app developer, the apps listed in apps/ include various 
 - do not use readers/writers in async code, always use Queue.queues to communicate data between a main loop and run the async stuff in a separate thread
 - keep all reader writer code together in one loop
 - every reader and writer that must be called exactly once in every loop (use `with buf()` or `array writer['thing']` and r.ready())
+- you use the CFG.var directly for constants obtained from daemons, you do not create temp variables to simplify bulk refactoring
+- you always create single file apps with dependencies listed at the top via pep 723, if more than one file is involved (additional input/output files like .wav or NN models), then create a folder and write the main app code in main.py with the inline dependencies
+- If you are doing something more difficult that may require a lot of experimentation files, make a .venv and requirements.txt and work within that
+- always start with experimentation code, check if you're getting data using the cli commands
+- You limit verbosity, no extra comments and classes than what is absolutely necessary

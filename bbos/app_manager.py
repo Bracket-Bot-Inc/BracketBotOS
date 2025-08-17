@@ -52,7 +52,7 @@ class AppManager:
         self.get_available_apps()
 
     def get_available_apps(self) -> List[str]:
-        """Get list of available apps from APPS_PATH"""
+        """Get list of available apps """
         def is_autostart(app_name: str) -> bool:
             for app_dir in self.app_dirs:
                 autostart_file = app_dir / ".autostart"

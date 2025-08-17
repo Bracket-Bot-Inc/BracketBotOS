@@ -6,7 +6,7 @@ BIN_DIR = BRACKETBOT_DIR / "bin"
 DAEMONS_DIR = BRACKETBOT_DIR / "bbos" / "daemons"
 SYSTEMD_DIR = "/etc/systemd/system"
 CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
-APP_DIRS = " ".join([str(p) for p in [BRACKETBOT_DIR / "apps"]])
+APP_DIRS = " ".join([str(p) for p in [BRACKETBOT_DIR.parent / "BracketBotApps"]])
 SERVICES = {
     "hotspot": {"type": "oneshot", "as_user": False, "env": ""},
     "manager": {"type": "simple", "as_user": True, 
