@@ -75,28 +75,23 @@ def setup_cli_tools():
     bashrc = Path.home() / ".bashrc"
     bashrc.touch(exist_ok=True)
     bashrc_content = bashrc.read_text()
-    if (Path.home() / ".atuin").exists():
+    lines = bashrc_content.splitlines()
+    if shutil.which("atuin"):
         print("[+] Atuin is already installed.")
     else:
         print("Installing Atuin (shell history)...")
         subprocess.run(["bash", "-c", "curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh"], check=True)
         print("Configuring Atuin in ~/.bashrc (disabling up-arrow)...")
-        # Remove existing atuin init lines
-
-        lines = bashrc_content.splitlines()
-        filtered_lines = [line for line in lines if 'eval "$(atuin init' not in line]
-        with open(bashrc, 'w') as f:
-            f.write('\n'.join(filtered_lines))
-            f.write('eval "$(atuin init bash --disable-up-arrow)" # Initialize Atuin (history sync, disable up-arrow override)\n')
+        with open(bashrc, 'a') as f:
+            f.write('\neval "$(atuin init bash --disable-up-arrow)" # Initialize Atuin (history sync, disable up-arrow override)\n')
     if shutil.which("zoxide"):
         print("[+] Zoxide is already installed.")
     else:
         print("Installing zoxide (directory navigation)...")
         subprocess.run(["bash", "-c", "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"], check=True)
         print("Configuring zoxide in ~/.bashrc...")
-        if 'eval "$(zoxide init bash)"' not in bashrc_content:
-            with open(bashrc, 'a') as f:
-                f.write('eval "$(zoxide init bash)" # Initialize Zoxide\n')
+        with open(bashrc, 'a') as f:
+            f.write('\neval "$(zoxide init bash)" # Initialize Zoxide\n')
     print("[!] Shell tools setup complete.")
 
 def check_and_install_uv():
