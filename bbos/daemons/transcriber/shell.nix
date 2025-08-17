@@ -30,7 +30,7 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
       pip install -e ../../..
-      pip install -e /home/bracketbot/bracketbot-ai
+      pip install -e /home/bracketbot/BracketBotAI
     else
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."

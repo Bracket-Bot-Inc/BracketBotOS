@@ -12,7 +12,7 @@ import numpy as np
 
 # Configuration
 TURN_SPEED = 4.0  # Linear speed in m/s
-SPEED = 0.5  # Angular speed in rad/s
+SPEED = 1  # Angular speed in rad/s
 # Global variables
 writer = None
 

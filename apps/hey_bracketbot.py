@@ -54,7 +54,7 @@ def main():
     with Reader("transcript") as r_transcript, \
          Writer("led_strip.ctrl", Type('led_strip_ctrl')) as w_led_strip:
         rgb_array = np.zeros((CFG_LED_STRIP.num_leds,3), dtype=np.uint8)
-        color = [0, 0, 0]
+        color = [255, 255, 255]
         while True:
             if r_transcript.ready():
                 text = r_transcript.data['text']

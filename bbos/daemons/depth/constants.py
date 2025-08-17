@@ -33,6 +33,6 @@ def camera_depth(height, width):
 def camera_points(num_points):
     return [
         ("num_points", np.int32),
-        ("points", np.float64, (num_points, 3)),
+        ("points", np.float64, (num_points, 3)), # Transform convention, z is out of the camera imager and origin is the center of the camera imager
         ("colors", np.uint8, (num_points, 3)),
     ]
