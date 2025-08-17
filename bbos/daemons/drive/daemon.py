@@ -21,6 +21,10 @@ if __name__ == "__main__":
         od.set_speed_turns_right(0)
         R = CFG_drive.robot_width * 0.5  # half-baseline
         while True:
+            if od.has_errors():
+                od.dump_errors()
+                od.clear_errors_left()
+                od.clear_errors_right()
             p_l, v_l = od.get_pos_vel_left()
             p_r, v_r = od.get_pos_vel_right()
             with w_state.buf() as b:

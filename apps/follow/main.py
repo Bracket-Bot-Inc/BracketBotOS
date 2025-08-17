@@ -38,6 +38,8 @@ def main():
                 # Convert BGR to RGB and get left half
                 results = model(stereo_img[:, :img_width, :], classes=[0], conf=0.35, iou=0.45)
                 # Save annotated image with detections
+                if len(results) > 0:
+                    cv2.imwrite('debug.jpg', results.plot())
             # Find the largest person detection
             cmd = np.zeros(2)
             if len(results) > 0:

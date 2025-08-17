@@ -95,7 +95,7 @@ class ODriveUART:
             "axis0", "axis0.encoder", "axis0.controller", "axis0.motor",
             "axis1", "axis1.encoder", "axis1.controller", "axis1.motor"
         ]
-        print('======= ODrive Errors =======')
+        print('======= ODrive Errors =======', flush=True)
         for src in error_sources:
             error_response = self.send_command(f'r {src}.error')
             try:
@@ -107,7 +107,7 @@ class ODriveUART:
                 continue
 
             if error_code == 0:
-                print(src + '.error=0x0: \033[92mNone\033[0m')
+                print(src + '.error=0x0: \033[92mNone\033[0m', flush=True)
                 continue
 
             error_prefix = f"{src.split('.')[-1].strip('01').upper()}_ERROR"
@@ -122,9 +122,9 @@ class ODriveUART:
                     error_string += f"{error_name.replace(error_prefix + '_', '').lower().replace('_', ' ')}, "
             error_string = error_string.rstrip(", ")
             print(
-                f"{src}.error={hex(error_code)}: \033[91m{error_string}\033[0m"
+                f"{src}.error={hex(error_code)}: \033[91m{error_string}\033[0m", flush=True
             )
-        print('=============================')
+        print('=============================', flush=True)
 
     def enable_torque_mode_left(self):
         self.send_command(
