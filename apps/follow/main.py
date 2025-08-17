@@ -1,8 +1,6 @@
 # /// script
 # dependencies = [
-#   "ultralytics",
-#   "turbojpeg-rpi",
-#   "openvino",
+#   "opencv-python",
 #   "bbos",
 #   "bracketbot-ai",
 # ]
@@ -11,8 +9,6 @@
 # bracketbot-ai = { path = "/home/bracketbot/BracketBotAI", editable = true }
 # ///
 from bbos import Config, Reader, Writer, Type
-import os, time
-from pathlib import Path
 import numpy as np
 import cv2
 from bracketbot_ai import Detector
