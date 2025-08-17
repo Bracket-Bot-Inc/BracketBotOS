@@ -55,7 +55,6 @@ def check_and_install_cursorrules():
         print("[+] cursor rules is already installed.")
         return
     print("[*] Installing cursorrules...")
-    os.makedirs(BRACKETBOT_DIR.parent / ".cursor", exist_ok=True)
     shutil.copytree(BRACKETBOT_DIR / ".cursor", BRACKETBOT_DIR.parent / ".cursor")
     print("[!] cursor rules installation complete.")
 
@@ -160,7 +159,7 @@ def main():
         add_paths_to_shell_profiles(add_to_PATH)
         shell = os.environ.get("SHELL", "/bin/bash")
     
-    print("Done! Please reboot!")
+    print("Done!")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
