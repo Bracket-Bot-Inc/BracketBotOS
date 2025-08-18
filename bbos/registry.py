@@ -4,7 +4,7 @@ from inspect import isclass
 from threading import Lock
 import numpy as np
 
-_latencies: dict[str, float] = {}
+_periods: dict[str, float] = {}
 _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
 _lock = Lock()
@@ -28,10 +28,10 @@ def register(robj):
     return deco(robj)
 
 def realtime(ms: int):
-    """Decorator that registers a type function with a frequency."""
+    """Decorator that registers a type that updates at a given period in milliseconds."""
     def deco(obj):
         key = obj.__name__
-        assert not isclass(obj), "frequency decorator must be used on a type function"
+        assert not isclass(obj), "period decorator must be used on a type function"
 
         with _lock:
             if key in _types:
@@ -39,7 +39,7 @@ def realtime(ms: int):
                     f"‘{key}’ already registered in {_types is _config and 'config' or 'types'}"
                 )
             _types[key] = obj
-            _latencies[key] = ms
+            _periods[key] = ms
         return obj  # object remains intact
     return deco
 
@@ -49,7 +49,7 @@ class Type:
         self._name = name
 
     def __call__(self, *args, **kwargs):
-        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _latencies[self._name]
+        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name]
 
 
 class Config:
