@@ -2,6 +2,7 @@
 import os, pwd, sys, time, signal
 from multiprocessing import Process
 from pathlib import Path
+import threading
 
 CURRENT_USER = pwd.getpwuid(os.getuid()).pw_name
 
@@ -96,8 +97,19 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
+    
+    def start_proc(proc):
+        proc.start()
+    
+    threads = []
     for p in procs:
-        p.start()
+        thread = threading.Thread(target=start_proc, args=(p,))
+        thread.start()
+        threads.append(thread)
+    
+    # Wait for all startup threads to complete
+    for thread in threads:
+        thread.join()
 
     while running:
         for p in procs:
