@@ -62,9 +62,10 @@ class TimeLog:
     def __init__(self, name):
         from bbos.ipc import Status
         self._name = name
-        self._buf = MovingAverage(100)
+        self._buf = MovingAverage(5)
         self._last = -1
         self._status = Status(f"{name}__{WHOAMI}__timelog")
+        print(f"[+] TimeLog: {name}__{WHOAMI}__timelog: {self._status._sock} -> {self._status._srv}", flush=True)
     def log(self):
         if self._last < 0:
             self._last = time.monotonic_ns()
@@ -83,6 +84,7 @@ class Loop:
     _num_calls = 0
     _i = 0
     _manage_latency = True
+    _lagging = False
     @staticmethod
     def keeptime():
         if Loop._i == Loop._num_calls - 1:
@@ -92,9 +94,11 @@ class Loop:
                 if sleep_for >= 0:
                     if Loop._manage_latency:
                         ns_sleep(sleep_for)
+                else:
+                    Loop._lagging = True
             Loop._last = time.monotonic_ns()
             for trigger, reset in Loop._triggers.values():
-                trigger[0] = (trigger[0] + 1) % reset
+                trigger[0] = (trigger[0] + 1) % reset if not Loop._lagging else 0
         else:
             Loop._i += 1
     

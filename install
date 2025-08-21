@@ -82,6 +82,7 @@ def setup_cli_tools():
         print("Installing Atuin (shell history)...")
         subprocess.run(["bash", "-c", "curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh"], check=True)
         print("Configuring Atuin in ~/.bashrc (disabling up-arrow)...")
+        subprocess.run(["sed", "-i", "/eval \"$(atuin init/d", str(bashrc)], check=True)
         with open(bashrc, 'a') as f:
             f.write('\neval "$(atuin init bash --disable-up-arrow)" # Initialize Atuin (history sync, disable up-arrow override)\n')
     if shutil.which("zoxide"):

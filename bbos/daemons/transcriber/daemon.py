@@ -58,6 +58,6 @@ def main(r_mic, w_text):
         w_text['text'] = txt
 
 if __name__ == "__main__":
-    with Reader("audio.mic") as r_mic, \
+    with Reader("speakerphone.mic") as r_mic, \
          Writer("transcript", Type('transcriber_text')) as w_text:
         main(r_mic, w_text)

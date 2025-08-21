@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Low‑latency full‑duplex: mic → /audio.mic SHM  |  /audio.speaker → loudspeaker
+Low‑latency full‑duplex: mic → /speakerphone.mic SHM  |  /speakerphone.speaker → loudspeaker
 Works like your original design but lets PortAudio own the timing.
 """
 
@@ -78,7 +78,7 @@ def main(w_mic, r_speak):
 
 if __name__ == "__main__":
     mic_type  = Type("speakerphone_mic")
-    r_speak = Reader("audio.speaker")
-    w_mic   = Writer("audio.mic", mic_type, keeptime=False)
+    r_speak = Reader("speakerphone.speaker")
+    w_mic   = Writer("speakerphone.mic", mic_type, keeptime=False)
     with w_mic, r_speak:
         main(w_mic, r_speak)

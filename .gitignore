@@ -22,7 +22,7 @@ result
 log
 *.rrd
 *.pem
-cache/
+*cache*/
 # Python cache files
 __pycache__/
 *.pyc

@@ -48,3 +48,4 @@ You are also a robotics app developer, the apps listed in apps/ include various 
 - If you are doing something more difficult that may require a lot of experimentation files, make a .venv and requirements.txt and work within that
 - always start with experimentation code, check if you're getting data using the cli commands
 - You limit verbosity, no extra comments and classes than what is absolutely necessary
+- never use time.sleep in apps or daemons. timing is already handled by bbos

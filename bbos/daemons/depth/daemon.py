@@ -2,6 +2,7 @@ from bbos import Reader, Writer, Type, Config
 import cv2
 import numpy as np
 from pathlib import Path
+import time
 
 cv2.ocl.setUseOpenCL(True)
 
@@ -12,36 +13,37 @@ CFG_D = Config("depth")
 CFG_P = Config("points")
 
 def disparity_to_camera_points(disp: cv2.UMat, Q: np.ndarray, left_img: cv2.UMat) -> tuple[np.ndarray, np.ndarray]:
-    """Convert disparity map to 3D camera coordinate points using OpenCL acceleration."""
-    # Convert UMat to numpy for processing (only when necessary)
     disp_np = disp.get()
     left_np = left_img.get()
-    
-    # Valid pixels (same disparity threshold as original)
+
     valid = disp_np > (CFG_D.min_disp + 0.5)
-    
     if not np.any(valid):
         return np.empty((0, 3)), np.empty((0, 3), dtype=np.uint8)
 
-    # Point cloud in camera frame (exactly like original working example)
-    pts_cam = cv2.reprojectImageTo3D(disp_np, Q) / 1000.0  # Convert mm to m
-    pts_cam = pts_cam[valid]
-    
-    # Get colors from left image (RGB conversion like original)
+    # Reproject full grid
+    pts_cam_all = cv2.reprojectImageTo3D(disp_np, Q) / 1000.0
     left_rgb = cv2.cvtColor(left_np, cv2.COLOR_BGR2RGB)
-    cols = left_rgb.reshape(-1, 3)[valid.ravel()]
 
-    # Filter points by distance (same as original)
+    # Mask valid
+    pts_cam = pts_cam_all[valid]
+    pts_rgb = left_rgb.reshape(-1, 3)[valid.ravel()]
+
+    # Distance filter
     dist_m = np.linalg.norm(pts_cam, axis=1)
     keep = dist_m < CFG_P.max_range
-    pts_cam, cols = pts_cam[keep], cols[keep]
-    
-    # Subsample points if needed
-    if CFG_P.stride > 1:
-        pts_cam = pts_cam[::CFG_P.stride]
-        cols = cols[::CFG_P.stride]
+    pts_cam, pts_rgb = pts_cam[keep], pts_rgb[keep]
 
-    return pts_cam, cols
+    # 2D grid subsampling
+    stride = CFG_P.stride
+    if stride > 1:
+        h, w = disp_np.shape
+        mask = np.zeros_like(valid, dtype=bool)
+        mask[::stride, ::stride] = True
+        subsample = valid & mask
+        pts_cam = cv2.reprojectImageTo3D(disp_np, Q)[subsample] / 1000.0
+        pts_rgb = left_rgb.reshape(-1, 3)[subsample.ravel()]
+
+    return pts_cam, pts_rgb
 
 def load_calib(path: Path, scale: float):
     """Load fisheye rectification matrices and return the scaled camera model."""
@@ -113,18 +115,21 @@ def main():
         print(f"OpenCL available: {cv2.ocl.haveOpenCL()}", flush=True)
         if cv2.ocl.haveOpenCL():
             print(f"OpenCL device: {cv2.ocl.Device.getDefault().name()}", flush=True)
-
         print('starting depth', flush=True)
+
+        depth_mm = None
+        pts_cam = None
+        pts_rgb = None
+        t0 = time.time()
         while True:
             if r_jpeg.ready():
                 # Decode and split stereo image
                 stereo = cv2.imdecode(r_jpeg.data["jpeg"], cv2.IMREAD_COLOR)
                 left  = cv2.UMat(stereo[:, :img_w])
                 right = cv2.UMat(stereo[:, img_w:])
-                
                 # Rectify using pre-computed maps (OpenCL accelerated)
-                left_r  = cv2.remap(left,  map1x_gpu, map1y_gpu, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
-                right_r = cv2.remap(right, map2x_gpu, map2y_gpu, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT)
+                left_r  = cv2.remap(left,  map1x_gpu, map1y_gpu, cv2.INTER_LINEAR)
+                right_r = cv2.remap(right, map2x_gpu, map2y_gpu, cv2.INTER_LINEAR)
                 
                 # Resize (OpenCL accelerated)
                 left_ds  = cv2.resize(left_r,  (width_D, height_D), interpolation=cv2.INTER_AREA)
@@ -150,21 +155,20 @@ def main():
                 # Ensure type checker knows these are initialised
                 assert fx_ds is not None and baseline_m is not None, "Stereo parameters not initialised"
                 depth_m[mask] = fx_ds * baseline_m / denom[mask]
-                
+
                 # Encode depth to 16-bit PNG (millimetres – preserves precision)
                 depth_mm = np.clip(depth_m * 1000.0, 0, 65535).astype(np.uint16)
-                pts_cam, cols = disparity_to_camera_points(disp_float, Q, left_ds)
-
-                with w_depth.buf() as b:
-                    b['rect'][0] = left_ds.get()
-                    b['rect'][1] = right_ds.get()
-                    b['depth'] = depth_mm.reshape((height_D, width_D))
-                    b['timestamp'] = r_jpeg.data['timestamp']
-
-                with w_points.buf() as b:
+                pts_cam, pts_rgb = disparity_to_camera_points(disp_float, Q, left_ds)
+            with w_points.buf() as b:
+                if pts_cam is not None and pts_rgb is not None:
                     b['num_points'] = len(pts_cam)
-                    b['points'][:len(pts_cam)] = pts_cam
-                    b['colors'][:len(cols)] = cols
+                    b['points'][:len(pts_cam)] = CFG_D.T_cam.inv()(pts_cam)
+                    b['colors'][:len(pts_rgb)] = pts_rgb
+                    b['timestamp'] = r_jpeg.data['timestamp']
+            with w_depth.buf() as b:
+                if depth_mm is not None:
+                    print(depth_mm.shape, flush=True)
+                    b['depth'] = depth_mm
                     b['timestamp'] = r_jpeg.data['timestamp']
 
 
