@@ -33,7 +33,7 @@ if __name__ == "__main__":
             w_status['voltage'] = float(od.get_bus_voltage())
             if r_ctrl.ready():
                 vd, wd = r_ctrl.data['twist'][:2]  # desired linear, angular
-                vd_l, vd_r = vd + wd * R, wd * R - vd, 
+                vd_l, vd_r = vd - (wd * R) / 2, vd + (wd * R) / 2, 
             if not r_ctrl.readable or (np.datetime64(time.time_ns(), "ns") - r_ctrl.data['timestamp']) > np.timedelta64(200, "ms"):
                 vd_l, vd_r = 0, 0
             od.set_speed_mps_left(vd_l)
