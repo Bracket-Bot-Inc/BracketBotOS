@@ -52,7 +52,7 @@ for writer, info in writer_data.items():
         continue
     print(f"  Caller : {info['caller']}")
     print(f"  Owner  : {info['owner']}")
-    print(f"  Target Latency: {info['latency']} ms")
+    print(f"  Target Period: {info['period']} ms")
     print("  DType  :")
     for f in info['dtype']:
         if len(f) == 3:
