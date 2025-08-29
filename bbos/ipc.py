@@ -14,6 +14,7 @@ class Status:
         self._sock = self.name2socket(name)
         self._data = data
         self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
+        print(f"[+] Status: {name} -> {self._srv}", flush=True)
         try:
             self._srv.bind(self._sock)
         except OSError as e:
@@ -65,10 +66,10 @@ def _caller_signature():
     f = inspect.stack()[2]
     return f"{os.path.abspath(f.filename)}:{f.lineno}"
 
-def _encode_lock(sig, dtype, latency):
+def _encode_lock(sig, dtype, period):
     owner = Path(sys.modules['__main__'].__file__)
     owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
-    return json.dumps({"caller": sig, "dtype": dtype.descr, "latency": latency, "owner": owner}).encode()
+    return json.dumps({"caller": sig, "dtype": dtype.descr, "period": period, "owner": owner}).encode()
 
 
 def json_descr_to_dtype(desc):
@@ -93,11 +94,11 @@ def json_descr_to_dtype(desc):
 
 class Writer:
     def __init__(self, name, datatype: Type | List[tuple], keeptime=True):
-        shmtype, latency = datatype if isinstance(datatype, tuple) else datatype()
+        shmtype, period = datatype if isinstance(datatype, tuple) else datatype()
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
         sig = _caller_signature()
-        self._lock: bytes = _encode_lock(sig, shmdtype, latency)
+        self._lock: bytes = _encode_lock(sig, shmdtype, period)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
         self._status = Status(name, self._lock)
 
@@ -106,7 +107,7 @@ class Writer:
             # set loop trigger
             self._trigger = [0] # mutable counter
             Loop.init(self._trigger)
-            Loop.set_ms(latency, self._trigger)
+            Loop.set_ms(period, self._trigger)
 
         # create shared memory
         self._shm = posix_ipc.SharedMemory(
@@ -116,6 +117,8 @@ class Writer:
             size=size)
         self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
                                   mmap.PROT_READ | mmap.PROT_WRITE)
+        self._mapfile.write(b'\x00' * shmdtype.itemsize)
+        self._mapfile.flush()
         self._seq = ctypes.c_uint32.from_buffer(self._mapfile, 0)
         self._seq.value = 0
         self._buf = np.ndarray(1,
@@ -211,22 +214,28 @@ class Reader:
                 if self._keeptime:
                     Loop.keeptime()
                 return self._readable
-            lock = json.loads(self._writer_lock)
-            shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
-            if self._keeptime:
-                self._trigger[0] = 0
-                Loop.set_ms(lock["latency"], self._trigger)
-            self._readable = True
-            size = shmdtype.itemsize + CACHE_LINE
-            self._shm = posix_ipc.SharedMemory(self._name)
-            self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
-                                    mmap.PROT_READ)
-            self._seq = memoryview(self._mapfile)[:4].cast('I')
-            self._buf = np.ndarray(1,
-                                dtype=shmdtype,
-                                buffer=memoryview(self._mapfile)[CACHE_LINE:])
-            self._data = np.zeros_like(self._buf)[0]
-            self._shm.close_fd()
+            try:
+                lock = json.loads(self._writer_lock)
+                shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
+                if self._keeptime:
+                    self._trigger[0] = 0
+                    Loop.set_ms(lock["period"], self._trigger)
+                self._readable = True
+                size = shmdtype.itemsize + CACHE_LINE
+                self._shm = posix_ipc.SharedMemory(self._name)
+                self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
+                                        mmap.PROT_READ)
+                self._seq = memoryview(self._mapfile)[:4].cast('I')
+                self._buf = np.ndarray(1,
+                                    dtype=shmdtype,
+                                    buffer=memoryview(self._mapfile)[CACHE_LINE:])
+                self._data = np.zeros_like(self._buf)[0]
+                self._shm.close_fd()
+            except Exception as e:
+                self._readable = False
+                if self._keeptime:
+                    Loop.keeptime()
+                return self._readable
         data = self._read()
         stale = data['timestamp'] == self._data['timestamp']
         self._data = data

@@ -49,6 +49,8 @@ class Type:
         self._name = name
 
     def __call__(self, *args, **kwargs):
+        if not self._name in _types:
+            raise ValueError(f"Type {self._name} not found! Select from: {list(_types.keys())}")
         return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name]
 
 

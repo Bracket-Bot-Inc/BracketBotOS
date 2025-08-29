@@ -77,22 +77,22 @@ class TimeLog:
 
 
 class Loop:
-    _latency = 100 # ms
+    _period = 100 # ms
     _last = -1
     _requested_ms = set()
     _triggers = {}
     _num_calls = 0
     _i = 0
-    _manage_latency = True
+    _manage_period = True
     _lagging = False
     @staticmethod
     def keeptime():
         if Loop._i == Loop._num_calls - 1:
             Loop._i = 0 
             if Loop._last > 0:
-                sleep_for = 1_000_000*Loop._latency - (time.monotonic_ns() - Loop._last)
+                sleep_for = 1_000_000*Loop._period - (time.monotonic_ns() - Loop._last)
                 if sleep_for >= 0:
-                    if Loop._manage_latency:
+                    if Loop._manage_period:
                         ns_sleep(sleep_for)
                 else:
                     Loop._lagging = True
@@ -109,9 +109,9 @@ class Loop:
         print(Loop._triggers)
 
     @staticmethod
-    def manage_latency(value):
+    def manage_period(value):
         assert isinstance(value, bool)
-        Loop._manage_latency = value
+        Loop._manage_period = value
 
     @staticmethod
     def set_ms(ms, trigger):
@@ -119,13 +119,13 @@ class Loop:
         if not ms in Loop._requested_ms:
             Loop._requested_ms.add(ms)
             print(Loop._requested_ms)
-            new_latency = math.gcd(*Loop._requested_ms)
-            if len(Loop._requested_ms) != 1 and new_latency != Loop._latency:
-                multiplier = Loop._latency // new_latency
+            new_period = math.gcd(*Loop._requested_ms)
+            if len(Loop._requested_ms) != 1 and new_period != Loop._period:
+                multiplier = Loop._period // new_period
                 for t in Loop._triggers:
                     Loop._triggers[t][1] *= multiplier
-                print(f"[+] Changed Loop._latency from {Loop._latency}ms to {new_latency}ms")
-            Loop._latency = new_latency
-        Loop._triggers[hex(id(trigger))] = [trigger, int(ms / Loop._latency)]
-        print(f"[+] Loop._latency: {Loop._latency}ms")
+                print(f"[+] Changed Loop._period from {Loop._period}ms to {new_period}ms")
+            Loop._period = new_period
+        Loop._triggers[hex(id(trigger))] = [trigger, int(ms / Loop._period)]
+        print(f"[+] Loop._period: {Loop._period}ms")
         print(Loop._triggers)
