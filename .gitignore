@@ -6,7 +6,7 @@
 *openvino*
 yolo8n*
 *.safetensor
-*wifi.txt
+*.txt
 mnt
 *.img
 *.xz
