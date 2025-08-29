@@ -1,12 +1,12 @@
 from typing import List, Set
 from bbos.registry import Type 
 from bbos.time import TimeLog, Loop
-from bbos.os_utils import CACHE_LINE
 
 import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit, mmap, time, selectors, socket
 import numpy as np
 from pathlib import Path
 
+CACHE_LINE = 64
 
 class Status:
     PAYLOAD_SIZE = 4096

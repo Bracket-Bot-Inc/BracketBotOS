@@ -16,7 +16,6 @@ class depth:
     pre_filter_cap = 25  # Pre-filter to normalize image brightness (15-63 typical)
     width_D, height_D = (int(cam.width//2 * downsample), int(cam.height * downsample))
     T_base_cam = trans([0,0,1.55]) @ rot([-1,0,0], 90) @ rot([-1,0,0], 36) 
-    #T_cam = trans([0,0,0])
 
 @register
 class points:
