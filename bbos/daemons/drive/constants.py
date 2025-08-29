@@ -11,7 +11,7 @@ import numpy as np
 class drive:
     rate_status: int = 1
     rate_state: int = 50
-    robot_width: float = 0.21
+    robot_width: float = 0.3275
 
 
 @register
