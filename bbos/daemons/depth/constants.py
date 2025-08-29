@@ -2,38 +2,41 @@ from bbos.registry import *
 from bbos.tf import *
 import numpy as np
 
+cam = Config('stereo')
 
 @register
 class depth:
-    downsample = 0.5   # 37.5 % resolution → faster and less noisy
-    window_size = 21   # StereoBM block size
-    min_disp = -16
-    num_disp = 64     # Must be multiple of 16
-    uniqueness = 7
-    speckle_window = 150
-    speckle_range = 1
-    pre_filter_cap = 21
-    T_cam = rot([0,0,1],180) @ trans([0,-1.55,0]) @ rot([1,0,0],-36)
+    downsample = 0.375   # 37.5 % resolution → faster and less noisy
+    window_size = 13    # StereoBM block size (odd number, 5-21 typical) - smaller = more detail
+    min_disp = 0
+    num_disp = 32     # Must be multiple of 16
+    uniqueness = 7     # Lower = more matches but potentially more noise (5-15 typical)
+    speckle_window = 75   # Size of smooth disparity regions to consider noise
+    speckle_range = 32  # Max disparity variation within each connected component
+    pre_filter_cap = 25  # Pre-filter to normalize image brightness (15-63 typical)
+    width_D, height_D = (int(cam.width//2 * downsample), int(cam.height * downsample))
+    T_base_cam = trans([0,0,1.55]) @ rot([-1,0,0], 90) @ rot([-1,0,0], 36) 
     #T_cam = trans([0,0,0])
 
 @register
 class points:
     stride = 2         # Process every Nth frame to reduce CPU usage
     max_range = 5.0
+    num_points = int(np.floor((depth.width_D * depth.height_D + stride - 1) / stride))
 
 
 @realtime(ms=100)
-def camera_depth(height, width):
+def camera_depth():
     return [
-        ("rect", np.float64, (2, height, width, 3)),
-        ("depth", np.uint16, (height, width)),
+        ("rect", np.float64, (2, depth.height_D, depth.width_D, 3)),
+        ("depth", np.uint16, (depth.height_D, depth.width_D)),
     ]
 
 
 @realtime(ms=100)
-def camera_points(num_points):
+def camera_points():
     return [
         ("num_points", np.int32),
-        ("points", np.float16, (num_points, 3)), # Transform convention, z is out of the camera imager and origin is the center of the camera imager
-        ("colors", np.uint8, (num_points, 3)),
+        ("points", np.float16, (points.num_points, 3)), # Transform convention, z is out of the camera imager and origin is the center of the camera imager
+        ("colors", np.uint8, (points.num_points, 3)),
     ]
