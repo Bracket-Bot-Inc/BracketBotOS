@@ -50,17 +50,17 @@ if __name__ == "__main__":
          Reader('drive.state') as r_drive, \
          Writer('localizer.pose', Type("localizer_pose")) as w_pose:
 
-        estimator = DiffDriveEstimator2D(
-            base_width_m=CFG_drive.robot_width,
-            wheel_diam_m=CFG_odrive.wheel_diam,
-            grid_axis=CFG.grid_axis,
-            grid_axis_sign=CFG.grid_axis_sign,
-            gyro_beta_std=np.deg2rad(0.5),
-            beta_is_biased=True,  # Estimate gyro bias
-            q_theta=1e-3,
-            q_x=5e-2,
-            q_y=5e-2
-        )
+        # estimator = DiffDriveEstimator2D(
+        #     base_width_m=CFG_drive.robot_width,
+        #     wheel_diam_m=CFG_odrive.wheel_diam,
+        #     grid_axis=CFG.grid_axis,
+        #     grid_axis_sign=CFG.grid_axis_sign,
+        #     gyro_beta_std=np.deg2rad(0.5),
+        #     beta_is_biased=True,  # Estimate gyro bias
+        #     q_theta=1e-3,
+        #     q_x=5e-2,
+        #     q_y=5e-2
+        # )
         x = y = yaw = 0.0  # x=right, y=forward, yaw=heading
         last_left = last_right = None
         # Main loop
