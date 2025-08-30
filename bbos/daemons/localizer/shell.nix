@@ -67,7 +67,6 @@ pkgs.mkShell {
     python311Packages.matplotlib
     python311Packages.pybind11
     cmake
-    inekf
   ];
 
   shellHook = ''

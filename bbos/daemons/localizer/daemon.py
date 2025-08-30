@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 from bbos import Reader, Writer, Config, Type
-from model import DiffDriveEstimator2D
+#from model import DiffDriveEstimator2D
 import matplotlib.pyplot as plt
 
 def compute_odometry(
