@@ -17,9 +17,6 @@ pkgs.mkShell {
   ];
 
   shellHook = ''
-    # Make inekf available in PYTHONPATH
-    export PYTHONPATH="${inekf}/lib/python3.11/site-packages:$PYTHONPATH"
-    
     if [ ! -d "venv" ]; then
       python -m venv venv --system-site-packages
       source venv/bin/activate
