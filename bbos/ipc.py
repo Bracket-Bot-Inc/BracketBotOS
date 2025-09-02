@@ -195,11 +195,11 @@ class Writer:
             print(f"Writer {self._name} exited with exception", flush=True)
             traceback.print_exception(exc_type, exc_val, exc_tb)
         try:
-            if self._status_thread:
-                self._status_thread_stop.set()
-                self._status_thread.join()
             if self._keeptime:
                 Loop.remove(self._trigger)
+            else:
+                self._status_thread_stop.set()
+                self._status_thread.join()
             self._shm.unlink()
             self._status.close()
         except:
@@ -241,12 +241,12 @@ class Reader:
                     self._readable = False
                     if self._keeptime:
                         Loop.keeptime()
-                    return self._readable
+                    return False
             else:
                 self._readable = False
                 if self._keeptime:
                     Loop.keeptime()
-                return self._readable
+                return False
             try:
                 lock = json.loads(self._writer_lock)
                 shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
@@ -268,7 +268,7 @@ class Reader:
                 self._readable = False
                 if self._keeptime:
                     Loop.keeptime()
-                return self._readable
+                return False
         data = self._read()
         stale = data['timestamp'] == self._data['timestamp']
         self._data = data
@@ -276,7 +276,7 @@ class Reader:
             self._tlog.log()
         if self._keeptime:
             Loop.keeptime()
-        return not stale
+        return not self._keeptime or not stale
 
     def _read(self):
         """Guarantees a good read"""

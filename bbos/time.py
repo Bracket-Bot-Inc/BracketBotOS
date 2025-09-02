@@ -94,7 +94,7 @@ class Loop:
     _lagging = False
     @staticmethod
     def keeptime():
-        if Loop._i == Loop._num_calls - 1:
+        if Loop._i >= Loop._num_calls - 1:
             Loop._i = 0 
             if Loop._last > 0:
                 sleep_for = 1_000_000*Loop._period - (time.monotonic_ns() - Loop._last)
