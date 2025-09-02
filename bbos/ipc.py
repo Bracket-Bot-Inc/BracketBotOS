@@ -198,6 +198,7 @@ class Writer:
             if self._keeptime:
                 Loop.remove(self._trigger)
             else:
+                time.sleep(0.1)
                 self._status_thread_stop.set()
                 self._status_thread.join()
             self._shm.unlink()
