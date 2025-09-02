@@ -5,6 +5,7 @@ from bbos.time import TimeLog, Loop
 import os, json, inspect, contextlib, sys, traceback, ctypes, posix_ipc, atexit, mmap, time, selectors, socket
 import numpy as np
 from pathlib import Path
+import threading
 
 CACHE_LINE = 64
 
@@ -120,9 +121,20 @@ class Writer:
         self._lock: bytes = _encode_lock(sig, shmdtype, period)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
         self._status = Status(name, self._lock)
-
         self._keeptime = keeptime
-        if keeptime:
+        if period is None:
+            self._keeptime = False
+            self._status_thread_stop = threading.Event()
+            def _status_loop():
+                while not self._status_thread_stop.is_set():
+                    self._status.update()
+                    time.sleep(0.01)
+            self._status_thread = threading.Thread(
+                target=_status_loop,
+                daemon=True
+            )
+            self._status_thread.start()
+        if self._keeptime:
             # set loop trigger
             self._trigger = [0] # mutable counter
             Loop.init(self._trigger)
@@ -179,8 +191,14 @@ class Writer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
+            print(f"Writer {self._name} exited with exception", flush=True)
             traceback.print_exception(exc_type, exc_val, exc_tb)
         try:
+            if self._status_thread:
+                self._status_thread_stop.set()
+                self._status_thread.join()
+            if self._keeptime:
+                Loop.remove(self._trigger)
             self._shm.unlink()
             self._status.close()
         except:
@@ -284,5 +302,7 @@ class Reader:
     def __exit__(self, exc_type, exc_val, exc_tb):
         if exc_type is not None:
             traceback.print_exception(exc_type, exc_val, exc_tb)
+        if self._keeptime:
+            Loop.remove(self._trigger)
         self._s.close()
         return True

@@ -201,6 +201,7 @@ def read_motors(port, packet, register_name, result_array):
 if __name__ == "__main__":
     port, packet = init_so101()
     with Writer("so101.state", Type("so101_state")) as w_state, \
+        Reader("so101.torque", keeptime=False) as r_torque, \
         Reader("so101.ctrl") as r_ctrl:
         state = np.zeros((3, len(CFG.motors)), dtype=np.float32)
         t3 = time.monotonic()
@@ -213,8 +214,11 @@ if __name__ == "__main__":
         ts = np.zeros(len(CFG.motors), dtype=np.float32)
         t = time.monotonic()
         while True:
+            if r_torque.ready():
+                print(r_torque.data['enable'], flush=True)
+                write_motors(port, packet, "Torque_Enable", r_torque.data['enable'])
             if r_ctrl.ready():
-                print(ps0 + r_ctrl.data['pos'])
+                #print(ps0 + r_ctrl.data['pos'])
                 write_motors(port, packet, "Goal_Position", ps0 + r_ctrl.data['pos'])
                 #write_motors(port, packet, "Goal_Velocity", r_ctrl['vel'])
             if w_state._update():

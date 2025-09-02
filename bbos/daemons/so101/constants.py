@@ -1,4 +1,4 @@
-from bbos import register, realtime
+from bbos import register, realtime, state
 import numpy as np
 
 # ----------------------------------------------------------------------
@@ -15,6 +15,10 @@ class so101:
 # ----------------------------------------------------------------------
 # Types
 # ----------------------------------------------------------------------
+
+@state
+def so101_torque():
+    return [("enable", np.bool_, so101.dof)]
 
 @realtime(ms=20)
 def so101_ctrl():

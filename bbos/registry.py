@@ -9,7 +9,7 @@ _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
 _lock = Lock()
 
-
+# --- Configs ---------------------------------------------------------------
 def register(robj):
     """Decorator that drtypes functions into _types and classes into _config."""
 
@@ -27,11 +27,27 @@ def register(robj):
 
     return deco(robj)
 
+# --- Types ---------------------------------------------------------------
+def state(robj):
+    """Decorator that registers a type for a state variable within a state machine"""
+    def deco(obj):
+        key = obj.__name__
+        assert not isclass(obj), "realtime decorator must be used on a type function"
+
+        with _lock:
+            if key in _types:
+                raise ValueError(
+                    f"‘{key}’ already registered in {_types is _config and 'config' or 'types'}"
+                )
+            _types[key] = obj
+        return obj  # object remains intact
+    return deco(robj)
+
 def realtime(ms: int):
     """Decorator that registers a type that updates at a given period in milliseconds."""
     def deco(obj):
         key = obj.__name__
-        assert not isclass(obj), "period decorator must be used on a type function"
+        assert not isclass(obj), "realtime decorator must be used on a type function"
 
         with _lock:
             if key in _types:
@@ -51,7 +67,7 @@ class Type:
     def __call__(self, *args, **kwargs):
         if not self._name in _types:
             raise ValueError(f"Type {self._name} not found! Select from: {list(_types.keys())}")
-        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name]
+        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name] if self._name in _periods else None
 
 
 class Config:

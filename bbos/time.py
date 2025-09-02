@@ -115,6 +115,11 @@ class Loop:
     def init(trigger):
         Loop._num_calls += 1
         Loop._triggers[hex(id(trigger))] = [trigger,1]
+    
+    @staticmethod
+    def remove(trigger):
+        Loop._num_calls -= 1
+        Loop._triggers.pop(hex(id(trigger)))
 
     @staticmethod
     def manage_period(value):
