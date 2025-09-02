@@ -27,16 +27,17 @@ if __name__ == "__main__":
                 od.clear_errors_right()
             p_l, v_l = od.get_pos_vel_left()
             p_r, v_r = od.get_pos_vel_right()
-            with w_state.buf() as b:
-                b['pos'] = [p_l, p_r]
-                b['vel'] = [v_l, v_r]
-            w_status['voltage'] = float(od.get_bus_voltage())
             if r_ctrl.ready():
                 vd, wd = r_ctrl.data['twist'][:2]  # desired linear, angular
-                vd_l, vd_r = vd + (wd * R), vd - (wd * R), 
+                vd_l, vd_r = vd + (wd * R), vd - (wd * R) 
             if not r_ctrl.readable or (np.datetime64(time.time_ns(), "ns") - r_ctrl.data['timestamp']) > np.timedelta64(200, "ms"):
                 vd_l, vd_r = 0, 0
             od.set_speed_mps_left(vd_l)
             od.set_speed_mps_right(vd_r)
+
+            with w_state.buf() as b:
+                b['pos'] = [p_l, p_r]
+                b['vel'] = [v_l, v_r]
+            w_status['voltage'] = float(od.get_bus_voltage())
     od.stop_left()
     od.stop_right()

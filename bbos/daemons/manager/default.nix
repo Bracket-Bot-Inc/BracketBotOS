@@ -75,7 +75,7 @@ logs = pkgs.writeShellApplication {
       # No argument provided - show all log files
       for f in /tmp/*.log; do
         echo -e "$PINK========== LOG FILE: $f ==========$RESET"
-        highlight_errors < "$f"
+        head -50 "$f" | highlight_errors
         echo ""
       done
     else

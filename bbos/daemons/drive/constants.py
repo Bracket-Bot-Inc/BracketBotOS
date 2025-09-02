@@ -9,8 +9,6 @@ import numpy as np
 # ----------------------------------------------------------------------
 @register
 class drive:
-    rate_status: int = 1
-    rate_state: int = 50
     robot_width: float = 0.3275
 
 
@@ -33,12 +31,12 @@ class odrive:
 # ----------------------------------------------------------------------
 
 
-@realtime(ms=30)
+@realtime(ms=50)
 def drive_ctrl():
     return [("twist", (np.float32, 2))]  # linear, angular
 
 
-@realtime(ms=30)
+@realtime(ms=50)
 def drive_state():
     return [("pos", (np.float32, 2)), ("vel", (np.float32, 2)),
             ("torque", (np.float32, 2))]

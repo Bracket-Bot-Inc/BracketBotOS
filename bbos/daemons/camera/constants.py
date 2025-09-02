@@ -17,7 +17,7 @@ class stereo:
     f_x = 1500 
 
 
-@realtime(ms=60)
+@realtime(ms=70)
 def camera_jpeg(buflen):
     return [
         ("bytesused", np.uint32),

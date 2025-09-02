@@ -10,70 +10,77 @@ class timespec(ctypes.Structure):
                 ("tv_nsec", c_long)]
 librt = ctypes.CDLL("librt.so.1", use_errno=True)
 CLOCK_MONOTONIC = 1
+
 def ns_sleep(ns: int):
-    sec = ns // 1_000_000_000
-    nsec = ns % 1_000_000_000
-    ts = timespec(sec, nsec)
+    ts = timespec(ns // 1_000_000_000, ns % 1_000_000_000)
     librt.clock_nanosleep(CLOCK_MONOTONIC, 0, ctypes.byref(ts), None)
 
 # https://github.com/commaai/openpilot/blob/master/common/util.py#L23
 class MovingAverage:
     def __init__(self, window_size: int):
-        self.window_size: int = window_size
-        self.buffer: list[float] = [0.0] * window_size
-        self.index: int = 0
-        self.count: int = 0
-        self.sum: float = 0.0
-        self.sum_sq: float = 0.0
+        self._window_size: int = window_size
+        self._buffer: list[float] = [0.0] * window_size
+        self._index: int = 0
+        self._count: int = 0
+        self._sum: float = 0.0
+        self._sum_sq: float = 0.0
+        self._max: float = 0.0
 
     def add(self, new_value: float):
         # Update the sum: subtract the value being replaced and add the new value
-        old_value = self.buffer[self.index]
-        self.sum -= old_value
-        self.sum_sq -= old_value * old_value
-        self.buffer[self.index] = new_value
-        self.sum += new_value
-        self.sum_sq += new_value * new_value
+        old_value = self._buffer[self._index]
+        self._sum -= old_value
+        self._sum_sq -= old_value * old_value
+        self._max = max(self._max, new_value)
+        self._buffer[self._index] = new_value
+        self._sum += new_value
+        self._sum_sq += new_value * new_value
         # Update the index in a circular manner
-        self.index = (self.index + 1) % self.window_size
+        self._index = (self._index + 1) % self._window_size
         # Track the number of added values (for partial windows)
-        self.count = min(self.count + 1, self.window_size)
+        self._count = min(self._count + 1, self._window_size)
 
     def last(self) -> float:
-        return self.buffer[self.index]
+        return self._buffer[self._index]
+
+    def is_reset(self) -> bool:
+        return self._index == 0
 
     def avg(self) -> float:
-        if self.count == 0:
+        if self._count == 0:
             return float('nan')
-        return self.sum / self.count
+        return self._sum / self._count
+
+    def max(self) -> float:
+        if self._count == 0:
+            return float('nan')
+        return self._max
 
     def std(self) -> float:
-        if self.count == 0:
+        if self._count == 0:
             return float('nan')
-        if self.count == 1:
+        if self._count == 1:
             return 0.0
         mean = self.avg()
-        variance = (self.sum_sq / self.count) - (mean * mean)
+        variance = (self._sum_sq / self._count) - (mean * mean)
         return math.sqrt(max(0.0, variance))
 
 
 class TimeLog:
-    time_store = struct.Struct("<qq") # avg, std
+    time_store = struct.Struct("<qqq") # avg, std, max
     def __init__(self, name):
         from bbos.ipc import Status
         self._name = name
-        self._buf = MovingAverage(5)
+        self._buf = MovingAverage(10)
         self._last = -1
         self._status = Status(f"{name}__{WHOAMI}__timelog")
-        print(f"[+] TimeLog: {name}__{WHOAMI}__timelog: {self._status._sock} -> {self._status._srv}", flush=True)
     def log(self):
         if self._last < 0:
             self._last = time.monotonic_ns()
         self._buf.add(float(time.monotonic_ns()-self._last))
         self._last = time.monotonic_ns()
-        if self._buf.index == 0:
-            self._status.update(self.time_store.pack(int(self._buf.avg()), int(self._buf.std())))
-        return self._buf.avg()
+        if self._buf.is_reset():
+            self._status.update(self.time_store.pack(int(self._buf.avg()), int(self._buf.std()), int(self._buf.max())))
 
 
 class Loop:
@@ -94,8 +101,10 @@ class Loop:
                 if sleep_for >= 0:
                     if Loop._manage_period:
                         ns_sleep(sleep_for)
+                    Loop._lagging = False
                 else:
                     Loop._lagging = True
+                    print(f"[-] Loop lagging by {(sleep_for) * 1e-6:.2f}ms", flush=True)
             Loop._last = time.monotonic_ns()
             for trigger, reset in Loop._triggers.values():
                 trigger[0] = (trigger[0] + 1) % reset if not Loop._lagging else 0
@@ -106,7 +115,6 @@ class Loop:
     def init(trigger):
         Loop._num_calls += 1
         Loop._triggers[hex(id(trigger))] = [trigger,1]
-        print(Loop._triggers)
 
     @staticmethod
     def manage_period(value):

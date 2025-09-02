@@ -8,13 +8,27 @@ from pathlib import Path
 
 CACHE_LINE = 64
 
+def is_socket_closed(sock: socket.socket) -> bool:
+    try:
+        # this will try to read bytes without blocking and also without removing them from buffer (peek only)
+        data = sock.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+        if len(data) == 0:
+            return True
+    except BlockingIOError:
+        return False  # socket is open and reading from it would block
+    except ConnectionResetError:
+        return True  # socket was closed for some other reason
+    except Exception as e:
+        logger.exception("unexpected exception when checking if a socket is closed")
+        return False
+    return False
+
 class Status:
     PAYLOAD_SIZE = 4096
     def __init__(self, name: str, data: bytes = None):
         self._sock = self.name2socket(name)
         self._data = data
         self._srv = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
-        print(f"[+] Status: {name} -> {self._srv}", flush=True)
         try:
             self._srv.bind(self._sock)
         except OSError as e:
@@ -38,21 +52,20 @@ class Status:
     def name2socket(name):
         return f"\0{name}.bbos"
     def update(self, data=None):
-        if self._data is None:
-            self._data = data
-            assert self._data is not None, "No data to update!"
+        if data is None:
+            data = self._data
+            assert data is not None, "No data to update!"
         try:
             for key, _ in self._sel.select(timeout=0):
                 if key.fileobj is self._srv:
                     c, _ = self._srv.accept()
-                    c.sendall(self._data)
+                    c.sendall(data)
                     c.setblocking(False)
                     self._clients.add(c)
             remove = set() 
             for c in self._clients:
                 try:
-                    data = c.recv(1, socket.MSG_DONTWAIT)
-                    if not data:
+                    if not c.recv(1, socket.MSG_DONTWAIT):
                         remove.add(c)
                 except BlockingIOError:
                     pass
@@ -61,6 +74,12 @@ class Status:
             self._clients -= remove
         except Exception as e:
             print(e)
+    def close(self):
+        self._srv.close()
+        self._sel.close()
+        for c in self._clients:
+            c.close()
+        self._clients.clear()
 
 def _caller_signature():
     f = inspect.stack()[2]
@@ -163,6 +182,7 @@ class Writer:
             traceback.print_exception(exc_type, exc_val, exc_tb)
         try:
             self._shm.unlink()
+            self._status.close()
         except:
             pass
         return True
@@ -192,19 +212,13 @@ class Reader:
             return True
 
     def ready(self):
-        try:
-            self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE, socket.MSG_DONTWAIT)
-        except BlockingIOError: # writer open
-            pass
-        except OSError: # writer closed, self._writer_lock is ""
-            pass
-        if not self._writer_lock: # enters when writer is closed
+        if not self._readable or is_socket_closed(self._s): # enters when writer is closed
             self._s = socket.socket(socket.AF_UNIX, socket.SOCK_SEQPACKET)
             res = self._s.connect_ex(Status.name2socket(self._name))
             if res == 0:
                 try: # antipattern: remove all these try catches
                     self._writer_lock = self._s.recv(Status.PAYLOAD_SIZE)
-                except OSError:
+                except OSError as e:
                     self._readable = False
                     if self._keeptime:
                         Loop.keeptime()
