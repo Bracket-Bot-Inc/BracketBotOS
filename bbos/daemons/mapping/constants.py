@@ -12,7 +12,7 @@ class mapping:
     miss_dec = int(-0.4 * 1000)  # -400
     max_logodds = hit_inc * 10
     min_logodds = miss_dec * 10
-    decay_lambda = 2.0
+    decay_lambda = 0.5
     min_hit = 0.1
     @staticmethod
     def unpack_keys(keys: np.ndarray):
@@ -29,6 +29,10 @@ class mapping:
 
         ijk = np.stack([i, j, k], axis=1).astype(np.float32)
         return (ijk + 0.5) * mapping.voxel_size
+    @staticmethod
+    def normalize(logodds: np.ndarray):
+        normalized = logodds.astype(np.float32) / 1000.0
+        return np.clip((normalized - mapping.min_logodds/1000.0) / (mapping.max_logodds/1000.0 - mapping.min_logodds/1000.0), 0.0, 1.0)
 
 
 @realtime(ms=100)
