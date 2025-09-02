@@ -121,6 +121,7 @@ class Writer:
         self._lock: bytes = _encode_lock(sig, shmdtype, period)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
         self._status = Status(name, self._lock)
+        self._name = name
         self._keeptime = keeptime
         if period is None:
             self._keeptime = False
