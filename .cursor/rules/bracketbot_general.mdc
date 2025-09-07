@@ -17,6 +17,10 @@ alwaysApply: true
 The users (and you) will mostly write code in @BracketBotApps:
 - There are example apps in @BracketBotApps that show how to use the system. There are correct ways to interface with the daemons.
 - users should not be writing code that directly interfaces with hardware, data used in apps should be acquired by daemons Writers and Readers.
+- For working with the speakerphone daemon:
+  - Use @BracketBotApps/to_wav.py as an example for capturing microphone audio to a WAV file
+  - Use @BracketBotApps/from_wav.py as an example for playing WAV files through the speaker
+  - These demonstrate proper use of Reader/Writer for speakerphone.mic and speakerphone.speaker
 
 @BracketBotAI has tooling for running models on the rockchip RK3588 NPU (see @BracketBotOS/bbos/daemons/transcriber) and GPU via OpenCL (see @BracketBotOS/bbos/daemons/depth)
 
