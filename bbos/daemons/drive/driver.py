@@ -2,6 +2,9 @@ import serial
 import odrive.enums
 import os
 import yaml
+from bbos import Config
+
+CFG_drive = Config("drive")
 
 
 class ODriveUART:
@@ -198,13 +201,13 @@ class ODriveUART:
         )
 
     def set_speed_mps_left(self, mps):
-        rps = mps / (self.cfg.wheel_diam * 3.14159)
+        rps = mps / (CFG_drive.wheel_diam * 3.14159)
         self.send_command(
             f'w axis{self.left_axis}.controller.input_vel {rps * self.dir_left:.4f}'
         )
 
     def set_speed_mps_right(self, mps):
-        rps = mps / (self.cfg.wheel_diam * 3.14159)
+        rps = mps / (CFG_drive.wheel_diam * 3.14159)
         self.send_command(
             f'w axis{self.right_axis}.controller.input_vel {rps * self.dir_right:.4f}'
         )

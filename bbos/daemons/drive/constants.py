@@ -10,6 +10,7 @@ import numpy as np
 @register
 class drive:
     robot_width: float = 0.3275
+    wheel_diam: float = 0.165
 
 
 @register
@@ -22,7 +23,6 @@ class odrive:
     axis_state_closed_loop: int = 8
     dir_left: int = 1  # Motor direction for left axis (1 or -1)
     dir_right: int = 1  # Motor direction for right axis (1 or -1)
-    wheel_diam: float = 0.165
     torque_bias: float = 0.05
 
 

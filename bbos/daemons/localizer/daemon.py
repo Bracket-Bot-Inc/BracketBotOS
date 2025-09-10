@@ -84,7 +84,7 @@ if __name__ == "__main__":
                     x,
                     y,
                     yaw,
-                    CFG_odrive.wheel_diam,
+                    CFG_drive.wheel_diam,
                     CFG_drive.robot_width
                 )
                 traj.append({'x': x, 'y': y, 'yaw': yaw})

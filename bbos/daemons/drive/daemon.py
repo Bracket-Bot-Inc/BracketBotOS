@@ -29,7 +29,7 @@ if __name__ == "__main__":
             p_r, v_r = od.get_pos_vel_right()
             if r_ctrl.ready():
                 vd, wd = r_ctrl.data['twist'][:2]  # desired linear, angular
-                vd_l, vd_r = vd + (wd * R), vd - (wd * R) 
+                vd_l, vd_r = (vd - (wd * R))/CFG_drive.wheel_diam/2, (vd + (wd * R))/CFG_drive.wheel_diam/2
             if not r_ctrl.readable or (np.datetime64(time.time_ns(), "ns") - r_ctrl.data['timestamp']) > np.timedelta64(200, "ms"):
                 vd_l, vd_r = 0, 0
             od.set_speed_mps_left(vd_l)
