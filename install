@@ -15,7 +15,7 @@ SERVICES = {
     "app_manager": {"type": "simple", 
             "exec_start": f"/bin/bash -c -l 'uv run {BIN_DIR}/app_manager {APP_DIRS}'",
             "as_user": True,
-            "env": "PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
+            "env": f"PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
 }
 
 SERVICE_TEMPLATE = """
