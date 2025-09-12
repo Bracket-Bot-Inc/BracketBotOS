@@ -7,6 +7,7 @@ import numpy as np
 _periods: dict[str, float] = {}
 _types: dict[str, callable] = {}  # functions & callables
 _config: dict[str, type] = {}  # classes
+_priorities: dict[str, int] = {}
 _lock = Lock()
 
 # --- Configs ---------------------------------------------------------------
@@ -43,7 +44,7 @@ def state(robj):
         return obj  # object remains intact
     return deco(robj)
 
-def realtime(ms: int):
+def realtime(ms: int, priority: int = 80):
     """Decorator that registers a type that updates at a given period in milliseconds."""
     def deco(obj):
         key = obj.__name__
@@ -56,6 +57,7 @@ def realtime(ms: int):
                 )
             _types[key] = obj
             _periods[key] = ms
+            _priorities[key] = priority
         return obj  # object remains intact
     return deco
 
@@ -67,7 +69,7 @@ class Type:
     def __call__(self, *args, **kwargs):
         if not self._name in _types:
             raise ValueError(f"Type {self._name} not found! Select from: {list(_types.keys())}")
-        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name] if self._name in _periods else None
+        return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name] if self._name in _periods else None, _priorities[self._name]
 
 
 class Config:

@@ -297,9 +297,10 @@ class ODriveUART:
     def set_watchdog_timeout(self, timeout):
         self.send_command(f'w axis0.config.watchdog_timeout {timeout}')
         self.send_command(f'w axis1.config.watchdog_timeout {timeout}')
+    
     def feed_watchdog(self):
-        self.send_command(f'w axis0.config.watchdog_feed 0')
-        self.send_command(f'w axis1.config.watchdog_feed 0')
+        self.send_command(f'w axis0.config.watchdog_feed 1')
+        self.send_command(f'w axis1.config.watchdog_feed 1')
 
     def get_bus_voltage(self):
         response = self.send_command('r vbus_voltage')

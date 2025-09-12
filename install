@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+<<<<<<< Updated upstream
 import os, argparse, subprocess, shutil, pwd, json
 from pathlib import Path
 BRACKETBOT_DIR = Path(__file__).parent.absolute()
@@ -17,195 +18,390 @@ SERVICES = {
             "as_user": True,
             "env": f"PATH=/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"}
 }
+=======
+# -*- coding: utf-8 -*-
+"""
+BracketBot service builder/installer (refactored)
+>>>>>>> Stashed changes
 
-SERVICE_TEMPLATE = """
-[Unit]
+- Builds daemon(s) found under bbos/daemons/* if they contain default.nix or shell.nix
+- Installs systemd units from SERVICE_SPECS below
+"""
+
+from __future__ import annotations
+import os
+import sys
+import pwd
+import shlex
+import tempfile
+import json
+import shutil
+import argparse
+import subprocess
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Iterable, Mapping, Optional
+
+# ---------- Paths & Users ----------
+BRACKETBOT_DIR = Path(__file__).resolve().parent
+BIN_DIR        = BRACKETBOT_DIR / "bin"
+DAEMONS_DIR    = BRACKETBOT_DIR / "bbos" / "daemons"
+SYSTEMD_DIR    = Path("/etc/systemd/system")
+
+def current_login_user() -> str:
+    """
+    Prefer the real login user (even when running via sudo).
+    Falls back to the effective user.
+    """
+    for var in ("SUDO_USER", "LOGNAME", "USER"):
+        v = os.environ.get(var)
+        if v:
+            return v
+    return pwd.getpwuid(os.getuid()).pw_name
+
+CURRENT_USER = current_login_user()
+
+# If you want to add more app dirs, do it here:
+APP_DIRS = [BRACKETBOT_DIR.parent / "BracketBotApps"]
+APP_DIRS_STR = " ".join(str(p) for p in APP_DIRS)
+
+# ---------- Service spec & rendering ----------
+@dataclass
+class ServiceSpec:
+    type: str
+    as_user: bool
+    exec_start: Optional[str] = None         # explicit ExecStart; if None we derive from daemon name
+    env: Mapping[str, str] | str | None = None
+    remain_after_exit: bool = True
+    wants: list[str] = field(default_factory=list)
+    after: list[str] = field(default_factory=lambda: ["network.target", "NetworkManager.service"])
+    binds_to: list[str] = field(default_factory=lambda: ["sys-subsystem-net-devices-wlan0.device"])
+    cpu_affinity: Optional[Iterable[int]] = None
+    # Caps/limits toggles (optional—useful if you enable RT in your daemons)
+    capability_bounding_set: Optional[Iterable[str]] = None
+    ambient_capabilities: Optional[Iterable[str]] = None
+    limit_rtprio: Optional[int] = None
+    limit_memlock: Optional[str] = None      # e.g. "infinity" or "67108864"
+    restrict_realtime: Optional[bool] = None
+    limit_nice: Optional[int] = None
+    no_new_privileges: Optional[bool] = None
+    kill_mode: Optional[str] = None
+    timeout_stop_sec: Optional[str] = None
+    send_sigkill: Optional[str] = None
+    restart: Optional[str] = None
+    restart_sec: Optional[str] = None
+
+def render_environment(env: Mapping[str, str] | str | None) -> str:
+    if env is None:
+        return ""
+    if isinstance(env, str):
+        env = env.strip()
+        return f"Environment={env}\n" if env else ""
+    # Mapping → one Environment= per key to avoid quoting pitfalls
+    lines = []
+    for k, v in env.items():
+        # systemd allows unquoted; use shlex.quote for safety (keeps spaces)
+        lines.append(f"Environment={k}={shlex.quote(str(v))}")
+    return ("\n".join(lines) + "\n") if lines else ""
+
+def render_user_block(as_user: bool) -> str:
+    if not as_user:
+        return ""
+    return f"User={CURRENT_USER}\nGroup={CURRENT_USER}\n"
+
+def render_optional(name: str, items: Optional[Iterable[str | int]]) -> str:
+    if not items:
+        return ""
+    joined = " ".join(str(i) for i in items)
+    return f"{name}={joined}\n"
+
+def render_bool(name: str, val: Optional[bool]) -> str:
+    if val is None:
+        return ""
+    return f"{name}={'yes' if val else 'no'}\n"
+
+SERVICE_TEMPLATE = """[Unit]
 Description={daemon} Service
-BindsTo=sys-subsystem-net-devices-wlan0.device
-After=network.target NetworkManager.service
-BindsTo=sys-subsystem-net-devices-wlan0.device
+{wants}{binds_to}After={after}
 
 [Service]
-{user_block}
-Type={type}
+{user_block}Type={type}
 ExecStart={exec_start}
-RemainAfterExit=yes
-Environment={env}
+{remain}{env}{cpu_affinity}{cap_bound}{ambient_caps}{limit_rtprio}{limit_memlock}{limit_nice}{restrict_rt}{no_new_privileges}
+{KillMode}{TimeoutStopSec}{SendSIGKILL}{Restart}{RestartSec}
 [Install]
 WantedBy=multi-user.target
 """
 
+def build_exec_start(daemon: str, spec: ServiceSpec) -> str:
+    if spec.exec_start:
+        return spec.exec_start
+    # Default: bbos/daemons/<daemon>/result/bin/<daemon>
+    p = (DAEMONS_DIR / daemon / "result" / "bin" / daemon).resolve()
+    return shlex.quote(str(p))
 
-def check_and_install_nix():
-    if shutil.which("nix"):
-        print("[+] Nix is already installed.")
+def render_unit(daemon: str, spec: ServiceSpec) -> str:
+    wants    = render_optional("Wants", spec.wants)
+    binds_to = render_optional("BindsTo", spec.binds_to)
+    after    = " ".join(spec.after) + "\n" if spec.after else ""
+    user_blk = render_user_block(spec.as_user)
+    env      = render_environment(spec.env)
+    remain   = f"RemainAfterExit={'yes' if spec.remain_after_exit else 'no'}\n"
+    cpu_aff  = render_optional("CPUAffinity", spec.cpu_affinity)
+    cap_bset = render_optional("CapabilityBoundingSet", spec.capability_bounding_set)
+    amb_caps = render_optional("AmbientCapabilities", spec.ambient_capabilities)
+    lim_rt   = f"LimitRTPRIO={spec.limit_rtprio}\n" if spec.limit_rtprio is not None else ""
+    lim_mem  = f"LimitMEMLOCK={spec.limit_memlock}\n" if spec.limit_memlock is not None else ""
+    restrt   = render_bool("RestrictRealtime", spec.restrict_realtime)
+    lim_nice  = f"LimitNICE={spec.limit_nice}\n" if spec.limit_nice is not None else ""
+    no_new_privileges = render_bool("NoNewPrivileges", spec.no_new_privileges)
+    KillMode=f"KillMode={spec.kill_mode}\n" if spec.kill_mode is not None else ""
+    TimeoutStopSec=f"TimeoutStopSec={spec.timeout_stop_sec}\n" if spec.timeout_stop_sec is not None else ""
+    SendSIGKILL=f"SendSIGKILL={spec.send_sigkill}\n" if spec.send_sigkill is not None else ""
+    Restart=f"Restart={spec.restart}\n" if spec.restart is not None else ""
+    RestartSec=f"RestartSec={spec.restart_sec}\n" if spec.restart_sec is not None else ""
+
+    return SERVICE_TEMPLATE.format(
+        daemon=daemon,
+        wants=wants,
+        binds_to=binds_to,
+        after=after,
+        user_block=user_blk,
+        type=spec.type,
+        exec_start=build_exec_start(daemon, spec),
+        remain=remain,
+        env=_nz(env),
+        cpu_affinity=_nz(cpu_aff),
+        cap_bound=_nz(cap_bset),
+        ambient_caps=_nz(amb_caps),
+        limit_rtprio=_nz(lim_rt),
+        limit_memlock=_nz(lim_mem),
+        limit_nice=_nz(lim_nice),
+        restrict_rt=_nz(restrt),
+        no_new_privileges=_nz(no_new_privileges),
+        KillMode=KillMode,
+        TimeoutStopSec=TimeoutStopSec,
+        SendSIGKILL=SendSIGKILL,
+        Restart=Restart,
+        RestartSec=RestartSec,
+    )
+
+# ---------- Specs ----------
+SERVICES: dict[str, ServiceSpec] = {
+    "on_boot": ServiceSpec(
+        type="oneshot",
+        as_user=False,
+        exec_start=None,
+        env=None,
+    ),
+    "manager": ServiceSpec(
+        type="simple",
+        as_user=True,
+        exec_start=str((DAEMONS_DIR / "manager" / "result" / "bin" / "manager").resolve())
+                    + f" {shlex.quote(str(DAEMONS_DIR))}",
+        env=None,
+        # RT profile:
+        capability_bounding_set=["CAP_SYS_NICE", "CAP_IPC_LOCK"],
+        ambient_capabilities=["CAP_SYS_NICE", "CAP_IPC_LOCK"],
+        limit_rtprio=95,
+        limit_memlock="infinity",
+        limit_nice=-90,
+        cpu_affinity=[4, 5, 6, 7],
+        restrict_realtime=False,
+        no_new_privileges=False,
+        kill_mode="control-group",
+        timeout_stop_sec="1s",
+        send_sigkill="yes",
+        restart="always",
+        restart_sec="0",
+    ),
+    "app_manager": ServiceSpec(
+        type="simple",
+        as_user=True,
+        exec_start=f"/bin/bash -lc {shlex.quote(f'uv run {BIN_DIR}/app_manager {APP_DIRS_STR}')}",
+        env={"PATH": f"/home/{CURRENT_USER}/.local/bin:/usr/local/bin:/usr/bin"},
+        # RT profile:
+        capability_bounding_set=["CAP_SYS_NICE", "CAP_IPC_LOCK"],
+        ambient_capabilities=["CAP_SYS_NICE", "CAP_IPC_LOCK"],
+        limit_rtprio=95,
+        limit_memlock="infinity",
+        limit_nice=-90,
+        cpu_affinity=[4, 5, 6, 7],
+        restrict_realtime=False,
+        no_new_privileges=False,
+        kill_mode="control-group",
+        timeout_stop_sec="1s",
+        send_sigkill="yes",
+        restart="always",
+        restart_sec="0",
+    ),
+}
+# ---------- Helpers ----------
+def run(cmd: list[str], **kw) -> None:
+    subprocess.run(cmd, check=True, **kw)
+
+def sudo() -> str:
+    # Use sudo only if not root
+    return "sudo" if os.geteuid() != 0 else ""
+
+def _nz(s: str | None) -> str:
+    return s or ""  # never return None
+
+
+def append_if_not_exists(line: str, file: Path) -> None:
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.touch(exist_ok=True)
+    content = file.read_text()
+    sentinel = line.strip()
+    if not any(l.strip() == sentinel for l in content.splitlines()):
+        file.write_text(content + ("" if content.endswith("\n") else "\n") + line + "\n")
+
+def check_and_install_uv() -> None:
+    if shutil.which("uv"):
+        print("[+] uv already installed")
         return
-    print("[*] Installing Nix...")
-    subprocess.run(
-        ["bash", "-c", "curl -L https://nixos.org/nix/install | bash"],
-        check=True)
-    bashrc = Path.home() / ".bashrc"
-    append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", bashrc)
-    print("[!] Nix installation complete.")
-    os.execvp("bash",
-              ["bash", "-l", "-c", f"_NIX_INSTALLED=1 uv run {__file__}"])
+    print("[*] Installing uv…")
+    run(["bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"])
+    append_if_not_exists("source ~/.cargo/env", Path.home() / ".bashrc")
+    print("[!] uv installation complete")
 
-def install_cursorrules():
-    print("[*] Installing cursorrules...")
-    shutil.copytree(BRACKETBOT_DIR / ".cursor", BRACKETBOT_DIR.parent / ".cursor", dirs_exist_ok=True)
-    print("[!] cursor rules installation complete.")
+def check_and_install_nix() -> None:
+    if shutil.which("nix"):
+        print("[+] Nix already installed")
+        return
+    print("[*] Installing Nix…")
+    run(["bash", "-c", "curl -L https://nixos.org/nix/install | bash"])
+    append_if_not_exists("source ~/.nix-profile/etc/profile.d/nix.sh", Path.home() / ".bashrc")
+    print("[!] Nix installation complete")
+    # Re-exec the script in a login shell so env is loaded
+    os.execvp("bash", ["bash", "-lc", f"_NIX_INSTALLED=1 uv run {shlex.quote(str(Path(__file__).resolve()))}"])
 
-def setup_vscode():
-    print("[*] Setting up vscode settings in ~/.vscode/settings.json...")
+def install_cursorrules() -> None:
+    print("[*] Installing cursor rules…")
+    src = BRACKETBOT_DIR / ".cursor"
+    dst = BRACKETBOT_DIR.parent / ".cursor"
+    if src.exists():
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+    print("[!] cursor rules installation complete")
+
+def setup_vscode() -> None:
+    print("[*] Setting up VS Code settings…")
     settings_json = {
-        "search.exclude": {
-            ".*": True
-        },
-        "files.exclude": {
-            ".*": True
-        }
+        "search.exclude": { ".*": True },
+        "files.exclude":  { ".*": True },
     }
     settings_file = Path.home() / ".vscode" / "settings.json"
     settings_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(settings_file, 'w') as f:
-        json.dump(settings_json, f, indent=2)
-    print("[!] vscode setup complete.")
+    settings_file.write_text(json.dumps(settings_json, indent=2))
+    print("[!] VS Code setup complete")
 
-def setup_cli_tools():
+def setup_cli_tools() -> None:
     bashrc = Path.home() / ".bashrc"
     bashrc.touch(exist_ok=True)
-    bashrc_content = bashrc.read_text()
-    lines = bashrc_content.splitlines()
     if shutil.which("atuin"):
-        print("[+] Atuin is already installed.")
+        print("[+] Atuin already installed")
     else:
-        print("Installing Atuin (shell history)...")
-        subprocess.run(["bash", "-c", "curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh"], check=True)
-        print("Configuring Atuin in ~/.bashrc (disabling up-arrow)...")
-        subprocess.run(["sed", "-i", "/eval \"$(atuin init/d", str(bashrc)], check=True)
-        with open(bashrc, 'a') as f:
-            f.write('\neval "$(atuin init bash --disable-up-arrow)" # Initialize Atuin (history sync, disable up-arrow override)\n')
+        print("[*] Installing Atuin…")
+        run(["bash", "-c", "curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh"])
+        subprocess.run(["sed", "-i", r"/eval \"\$(atuin init/d", str(bashrc)], check=False)
+        with bashrc.open("a") as f:
+            f.write('\neval "$(atuin init bash --disable-up-arrow)"\n')
     if shutil.which("zoxide"):
-        print("[+] Zoxide is already installed.")
+        print("[+] zoxide already installed")
     else:
-        print("Installing zoxide (directory navigation)...")
-        subprocess.run(["bash", "-c", "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"], check=True)
-        print("Configuring zoxide in ~/.bashrc...")
-        with open(bashrc, 'a') as f:
-            f.write('\neval "$(zoxide init bash)" # Initialize Zoxide\n')
-    print("[!] Shell tools setup complete.")
+        print("[*] Installing zoxide…")
+        run(["bash", "-c", "curl -sSfL https://raw.githubusercontent.com/ajeetdsouza/zoxide/main/install.sh | sh"])
+        with bashrc.open("a") as f:
+            f.write('\neval "$(zoxide init bash)"\n')
+    print("[!] Shell tools setup complete")
 
-def check_and_install_uv():
-    if shutil.which("uv"):
-        print("[+] uv is already installed.")
-        return
-    print("[*] Installing uv...")
-    subprocess.run(
-        ["bash", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
-        check=True)
-    bashrc = Path.home() / ".bashrc"
-    append_if_not_exists("source ~/.cargo/env", bashrc)
-    print("[!] uv installation complete.")
-
-
-def build_daemon(path: Path):
-    print(f"\033[1;32mBuilding {path.name}...\033[0m")  # bold green
-
+def build_daemon(path: Path) -> None:
+    print(f"\033[1;32mBuilding {path.name}…\033[0m")
     shell_nix = path / "shell.nix"
     default_nix = path / "default.nix"
-
     if shell_nix.exists():
-        subprocess.run(["nix-shell", "--run", "true"], cwd=path, check=True)
+        run(["nix-shell", "--run", "true"], cwd=path)
     elif default_nix.exists():
-        subprocess.run(
-            ["nix-build",
-             str(default_nix), "-o",
-             str(path / "result")],
-            check=True)
-
+        run(["nix-build", str(default_nix), "-o", str(path / "result")])
     else:
-        raise FileNotFoundError(f"No shell.nix or default.nix found in {path}")
+        print(f"[~] Skipping {path} (no shell.nix or default.nix)")
 
-
-def append_if_not_exists(line, file):
-    file = Path(file)
-    file.touch(exist_ok=True)
-    lines = [
-        l.rstrip("\n") for l in file.read_text().splitlines() if l.strip()
-    ]
-    if any(l.strip() == line.strip() for l in lines):
+def ensure_exec_exists(exec_path: str) -> None:
+    # Only warn; some ExecStart are shells (e.g., bash -lc "…")
+    parts = shlex.split(exec_path)
+    if not parts:
         return
-    print(f"Appending to {file}")
-    with file.open("a") as f:
-        f.write(f"\n{line}\n")
+    first = parts[0]
+    if first.startswith("/"):
+        p = Path(first)
+        if not p.exists():
+            print(f"[!] WARNING: ExecStart binary not found: {p}")
 
+def write_unit_file(daemon: str, text: str) -> Path:
+    target = SYSTEMD_DIR / f"{daemon}.service"
+    cmd = [sudo(), "tee", str(target)] if sudo() else ["tee", str(target)]
+    subprocess.run([c for c in cmd if c], input=text.encode(), check=True)
+    if sudo():
+        run([sudo(), "chmod", "0644", str(target)])
+    else:
+        run(["chmod", "0644", str(target)])
+    return target
 
-def add_paths_to_shell_profiles(paths):
+def install_service(daemon: str, spec: ServiceSpec) -> None:
+    unit_text = render_unit(daemon, spec)
+    ensure_exec_exists(build_exec_start(daemon, spec))
+    target = write_unit_file(daemon, unit_text)
+    run(["sudo", "systemctl", "daemon-reload"])
+    run(["sudo", "systemctl", "enable", target.name])
+    # Start non-oneshot by default; oneshot can be run manually if desired
+    try:
+        run(["sudo", "systemctl", "start", target.name])
+    except subprocess.CalledProcessError:
+        print(f"[!] {daemon}: start failed (unit enabled). Check with: sudo journalctl -u {daemon} -n 200 --no-pager")
+    print(f"[✓] {daemon}.service installed; will run as {CURRENT_USER if spec.as_user else 'root'}")
+
+def add_paths_to_shell_profiles(paths: Iterable[Path | str]) -> None:
     export_line = "export PATH=" + ":".join(str(p) for p in paths) + ":$PATH"
-    home = Path.home()
-    profiles = [
-        home / ".bashrc",
-    ]
-    for profile in profiles:
-        append_if_not_exists(export_line, profile)
+    append_if_not_exists(export_line, Path.home() / ".bashrc")
 
-
-def install_service(daemon: str, exec_start: str, cfg: dict) -> None:
-    service_file = Path(SYSTEMD_DIR) / f"{daemon}.service"
-
-    # build the unit text
-    user_block = (f"User={CURRENT_USER}\nGroup={CURRENT_USER}") if cfg['as_user'] else ""
-    unit_text  = SERVICE_TEMPLATE.format(daemon=daemon,
-                                  exec_start=cfg.get('exec_start', exec_start),
-                                  type=cfg['type'],
-                                  user_block=user_block,
-                                  env=cfg['env'])
-
-    # write + enable + start
-    subprocess.run(["sudo", "tee", str(service_file)],
-                   input=unit_text.encode(), check=True)
-    subprocess.run(["sudo", "systemctl", "daemon-reload"], check=True)
-    subprocess.run(["sudo", "systemctl", "enable", service_file.name], check=True)
-    subprocess.run(["sudo", "systemctl", "start",  service_file.name],  check=False)
-
-    print(f"[✓] {daemon}.service installed; will run as {CURRENT_USER if cfg['as_user'] else 'root'}.")
-
-
-def main():
+# ---------- Main ----------
+def main(only: Optional[list[str]]) -> None:
     check_and_install_uv()
     check_and_install_nix()
     setup_vscode()
     setup_cli_tools()
     install_cursorrules()
 
-    add_to_PATH = []
-    # build
-    for p in [d for d in DAEMONS_DIR.iterdir() if d.is_dir()]:
+    # Build daemons that have nix manifests (respects --only if given)
+    for p in sorted([d for d in DAEMONS_DIR.iterdir() if d.is_dir()]):
+        name = p.name
+        if only and name not in only:
+            continue
         if (p / "default.nix").exists() or (p / "shell.nix").exists():
             build_daemon(p)
-            if (p / "default.nix").exists():
-                add_to_PATH.append(p / "result" / "bin")
-        else:
-            print(f"Skipping {p} because it doesn't have a default.nix or shell.nix")
-    # install
-    for service in SERVICES:
-        p = DAEMONS_DIR / service
-        exec_path = f"{p.resolve()}/result/bin/{service}"
-        install_service(service, exec_path, SERVICES[service])
 
-    if add_to_PATH:
-        add_to_PATH.append(str(Path(__file__).parent.absolute() / 'bin'))
-        add_paths_to_shell_profiles(add_to_PATH)
-        shell = os.environ.get("SHELL", "/bin/bash")
-    
+    # Install services
+    for name, spec in SERVICES.items():
+        if only and name not in only:
+            continue
+        install_service(name, spec)
+
+    # Add result/bin paths to PATH for interactive shells (if present)
+    add_to_path: list[str] = []
+    for p in DAEMONS_DIR.iterdir():
+        rp = p / "result" / "bin"
+        if rp.exists():
+            add_to_path.append(str(rp))
+    add_to_path.append(str(BIN_DIR))
+    add_paths_to_shell_profiles(add_to_path)
+
     print("Done!")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--only",
-                        nargs="+",
-                        default=None,
-                        help="List of daemons to build/install")
-    args = parser.parse_args()
-
-    main()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--only", nargs="+", default=None, help="List of daemons/services to build/install")
+    args = ap.parse_args()
+    try:
+        main(args.only)
+    except KeyboardInterrupt:
+        sys.exit(130)

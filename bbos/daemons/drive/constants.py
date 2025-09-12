@@ -21,6 +21,7 @@ class odrive:
     left_axis: int = 0
     right_axis: int = 1
     axis_state_closed_loop: int = 8
+    watchdog_timeout: int = 2 # sec
     dir_left: int = 1  # Motor direction for left axis (1 or -1)
     dir_right: int = 1  # Motor direction for right axis (1 or -1)
     torque_bias: float = 0.05
@@ -32,12 +33,12 @@ class odrive:
 # ----------------------------------------------------------------------
 
 
-@realtime(ms=50)
+@realtime(ms=30)
 def drive_ctrl():
     return [("twist", (np.float32, 2))]  # linear, angular
 
 
-@realtime(ms=50)
+@realtime(ms=30)
 def drive_state():
     return [("pos", (np.float32, 2)), ("vel", (np.float32, 2)),
             ("torque", (np.float32, 2))]

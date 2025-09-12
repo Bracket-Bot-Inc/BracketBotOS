@@ -52,3 +52,22 @@ def rot(axis, angle_deg):
             raise ValueError("Input must be shape (3,) or (N,3)")
     
     return Operator(f, f_inv)
+
+
+def trans_Rt(t):
+    """Translation operator for left→right composition (x -> x + t)."""
+    t = np.asarray(t, dtype=float)
+    def f(x):      return x + t
+    def f_inv(x):  return x - t
+    return Operator(f, f_inv)
+
+def rot_Rt(R):
+    """
+    Rotation operator from a full rotation matrix R (3x3).
+    Left→right: (rot @ trans)(x) = R x + t
+    """
+    R = np.asarray(R, dtype=float)
+    Rt = R.T
+    def f(x):      return x @ R.T if x.ndim == 2 else R @ x
+    def f_inv(x):  return x @ Rt  if x.ndim == 2 else Rt @ x
+    return Operator(f, f_inv)

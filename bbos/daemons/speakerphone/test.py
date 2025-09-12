@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+!/usr/bin/env python3
 """
 Minimal CALLBACK‑based recorder (signed‑16‑bit WAV).
 Matches the behaviour of your working pull‑mode script.

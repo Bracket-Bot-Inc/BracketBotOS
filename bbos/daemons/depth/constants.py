@@ -16,6 +16,8 @@ class depth:
     pre_filter_cap = 25  # Pre-filter to normalize image brightness (15-63 typical)
     width_D, height_D = (int(cam.width//2 * downsample), int(cam.height * downsample))
     T_base_cam = trans([0,0,1.55]) @ rot([-1,0,0], 90) @ rot([-1,0,0], 36) 
+    fb_thr = 0.5
+    cov_vo = np.diag([0.05, 0.05, np.deg2rad(2.0)])**2
 
 @register
 class points:
@@ -24,15 +26,24 @@ class points:
     num_points = int(np.floor((depth.width_D * depth.height_D + stride - 1) / stride))
 
 
-@realtime(ms=100)
+@realtime(ms=150)
 def camera_depth():
     return [
         ("rect", np.float64, (2, depth.height_D, depth.width_D, 3)),
         ("depth", np.uint16, (depth.height_D, depth.width_D)),
     ]
 
+@realtime(ms=150)
+def camera_vo():
+    return [
+        ("q", np.float64, (4,)), # relative rotation
+        ("t", np.float64, (3,)),
+        ("q_acc", np.float64, (4,)), # accumulated rotation
+        ("t_acc", np.float64, (3,)),
+    ]
 
-@realtime(ms=100)
+
+@realtime(ms=150)
 def camera_points():
     return [
         ("num_points", np.int32),

@@ -5,26 +5,28 @@ import time
 
 CFG_drive = Config("drive")
 CFG_odrive = Config("odrive")
+CFG_imu = Config("imu")
 
 if __name__ == "__main__":
     with Writer('drive.state', Type("drive_state"))   as w_state, \
          Writer('drive.status', Type("drive_status")) as w_status, \
-         Reader('drive.ctrl')                         as r_ctrl:
+         Reader('drive.ctrl')                         as r_ctrl, \
+         Reader('imu.orientation')                    as r_ori:
         od = ODriveUART(CFG_odrive)
-        od.clear_errors_left()
-        od.clear_errors_right()
         od.start_left()
         od.enable_velocity_mode_left()
         od.start_right()
-        od.enable_velocity_mode_right()
-        od.set_speed_turns_left(0)
-        od.set_speed_turns_right(0)
         od.set_watchdog_timeout(CFG_odrive.watchdog_timeout)
+        od.enable_velocity_mode_right()
+        od.set_speed_mps_left(0)
+        od.set_speed_mps_right(0)
         od.enable_watchdog_left()
         od.enable_watchdog_right()
         od.clear_errors_left()
         od.clear_errors_right()
         R = CFG_drive.robot_width * 0.5  # half-baseline
+        tilt = 0.0
+        kp = 0.03
         while True:
             if od.has_errors():
                 od.dump_errors()
@@ -37,10 +39,13 @@ if __name__ == "__main__":
                 vd_l, vd_r = (vd - (wd * R))/CFG_drive.wheel_diam/2, (vd + (wd * R))/CFG_drive.wheel_diam/2
             if not r_ctrl.readable or (np.datetime64(time.time_ns(), "ns") - r_ctrl.data['timestamp']) > np.timedelta64(200, "ms"):
                 vd_l, vd_r = 0, 0
+            if r_ori.ready():
+                tilt = CFG_imu.get_robot_tilt(r_ori.data)
+                vd_l += kp * tilt
+                vd_r += kp * tilt
             od.set_speed_mps_left(vd_l)
             od.set_speed_mps_right(vd_r)
             od.feed_watchdog()
-
             with w_state.buf() as b:
                 b['pos'] = [p_l, p_r]
                 b['vel'] = [v_l, v_r]

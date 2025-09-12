@@ -12,24 +12,43 @@ CFG = Config("stereo")
 CFG_D = Config("depth")
 CFG_P = Config("points")
 
-def lr_consistency_mask(dL, dR, tol=1.0):
-    """
-    dL,dR disparity in pixels (same rectified geometry). NaN for invalid.
-    Returns mask True=keep.
-    """
-    H, W = dL.shape
-    xs = np.arange(W)[None, :].repeat(H, 0)
-    # project left pixel x to right image
-    xr = xs - dL
-    xr_round = np.rint(xr).astype(np.int32)
-    valid = (xr_round >= 0) & (xr_round < W) & np.isfinite(dL) & np.isfinite(dR)
-    # fetch R disparity at projected coordinate
-    dR_samp = np.full_like(dL, np.nan, dtype=np.float32)
-    dR_samp[valid] = dR[ np.arange(H)[:,None][valid], xr_round[valid] ]
-    # cross-check
-    ok = np.abs(dL + dR_samp) <= tol
-    mask = np.isfinite(dL) & ok
-    return mask
+def quat_rotate(q,v):
+    x,y,z,w=q; vx,vy,vz=v
+    t2=w*x; t3=w*y; t4=w*z
+    t5=-x*x; t6=x*y; t7=x*z
+    t8=-y*y; t9=y*z; t10=-z*z
+    return np.array([
+        2*((t8+t10)*vx+(t6-t4)*vy+(t3+t7)*vz)+vx,
+        2*((t4+t6)*vx+(t5+t10)*vy+(t9-t2)*vz)+vy,
+        2*((t7-t3)*vx+(t2+t9)*vy+(t5+t8)*vz)+vz
+    ],dtype=float).squeeze()
+
+def quat_from_R(R):
+    m00,m01,m02,m10,m11,m12,m20,m21,m22 = R.ravel()
+    tr = m00+m11+m22
+    if tr>0:
+        S=np.sqrt(tr+1.0)*2; w=0.25*S
+        x=(m21-m12)/S; y=(m02-m20)/S; z=(m10-m01)/S
+    elif (m00>m11) and (m00>m22):
+        S=np.sqrt(1.0+m00-m11-m22)*2; w=(m21-m12)/S; x=0.25*S
+        y=(m01+m10)/S; z=(m02+m20)/S
+    elif m11>m22:
+        S=np.sqrt(1.0+m11-m00-m22)*2; w=(m02-m20)/S
+        x=(m01+m10)/S; y=0.25*S; z=(m12+m21)/S
+    else:
+        S=np.sqrt(1.0+m22-m00-m11)*2; w=(m10-m01)/S
+        x=(m02+m20)/S; y=(m12+m21)/S; z=0.25*S
+    q=np.array([x,y,z,w],dtype=float)
+    return q/np.linalg.norm(q)
+
+def quat_mul(q1,q2):
+    x1,y1,z1,w1=q1; x2,y2,z2,w2=q2
+    return np.array([
+        w1*x2+x1*w2+y1*z2-z1*y2,
+        w1*y2-x1*z2+y1*w2+z1*x2,
+        w1*z2+x1*y2-y1*x2+z1*w2,
+        w1*w2-x1*x2-y1*y2-z1*z2
+    ],dtype=float).squeeze()
 
 def disparity_to_camera_points(disp: cv2.UMat, Q: np.ndarray, left_img: cv2.UMat) -> tuple[np.ndarray, np.ndarray]:
     disp_np = disp.get()
@@ -127,6 +146,7 @@ def main():
 
     with Reader('camera.jpeg') as r_jpeg, \
             Writer('camera.depth', Type("camera_depth")) as w_depth, \
+            Writer('camera.vo', Type("camera_vo")) as w_vo, \
             Writer('camera.points', Type("camera_points")) as w_points:
         
         print(f"OpenCL available: {cv2.ocl.haveOpenCL()}", flush=True)
@@ -137,11 +157,19 @@ def main():
         depth_mm = None
         pts_cam = None
         pts_rgb = None
+        prev_l_gray = None
         t0 = time.time()
+        q = np.array([0,0,0,1], dtype=np.float32)
+        qi = np.array([0,0,0,1], dtype=np.float32)
+        t = np.zeros(3, dtype=np.float32)
+        ti = np.zeros(3, dtype=np.float32)
+        timestamp = None
         while True:
             if r_jpeg.ready():
                 # Decode and split stereo image
                 stereo = cv2.imdecode(r_jpeg.data["jpeg"], cv2.IMREAD_COLOR)
+                timestamp = r_jpeg.data['timestamp']
+
                 left  = cv2.UMat(stereo[:, img_w:])
                 right = cv2.UMat(stereo[:, :img_w])
                 # Rectify using pre-computed maps (OpenCL accelerated)
@@ -155,6 +183,34 @@ def main():
                 # Convert to grayscale (OpenCL accelerated)
                 l_gray = cv2.cvtColor(left_ds,  cv2.COLOR_BGR2GRAY)
                 r_gray = cv2.cvtColor(right_ds, cv2.COLOR_BGR2GRAY)
+
+                if False and prev_l_gray is not None:
+                    # run VO: track features between prev_l_gray and l_gray
+                    # for example:
+                    pts0 = cv2.goodFeaturesToTrack(prev_l_gray, maxCorners=800, qualityLevel=0.01, minDistance=8)
+                    pts1, st, err = cv2.calcOpticalFlowPyrLK(prev_l_gray, l_gray, pts0, None)
+                    ptsback, stb, err = cv2.calcOpticalFlowPyrLK(l_gray, prev_l_gray, pts1, None)
+                    p0 = pts0.get() if isinstance(pts0, cv2.UMat) else pts0
+                    p1 = pts1.get() if isinstance(pts1, cv2.UMat) else pts1
+                    pb = ptsback.get() if isinstance(ptsback, cv2.UMat) else ptsback
+                    st = (st.get() if isinstance(st, cv2.UMat) else st).ravel().astype(bool)
+                    stb = (stb.get() if isinstance(stb, cv2.UMat) else stb).ravel().astype(bool)
+                    fb_err = np.linalg.norm(pb.reshape(-1,2) - p0.reshape(-1,2), axis=1)
+                    good = st & stb & np.isfinite(fb_err) & (fb_err < CFG_D.fb_thr)
+                    p0 = p0.reshape(-1,2)[good]
+                    p1 = p1.reshape(-1,2)[good]
+                    E, inl = cv2.findEssentialMat(p0, p1, P1_cam[:3, :3], method=cv2.RANSAC, prob=0.999, threshold=0.3)
+                    inl = inl.ravel().astype(bool) if inl is not None else np.zeros(len(p0), bool)
+                    _, Ri, ti, _ = cv2.recoverPose(E, p0[inl], p1[inl], P2_cam[:3, :3])
+                    print(ti, flush=True)
+                    print(Ri, flush=True)
+                    ti = ti.squeeze()
+                    qi = quat_from_R(Ri)
+                    t = quat_rotate(qi, ti) + t
+                    q = quat_mul(q, qi)
+                # After processing, update previous frame
+                prev_l_gray = l_gray
+                prev_r_gray = r_gray
                 
                 # Compute disparity (OpenCL accelerated)
                 disp = stereo_bm.compute(l_gray, r_gray)
@@ -177,15 +233,22 @@ def main():
                 depth_mm = np.clip(depth_m * 1000.0, 0, 65535).astype(np.uint16)
                 pts_cam, pts_rgb = disparity_to_camera_points(disp_float, Q, left_ds)
             with w_points.buf() as b:
-                if pts_cam is not None and pts_rgb is not None:
+                if pts_cam is not None and pts_rgb is not None and timestamp is not None:
                     b['num_points'] = len(pts_cam)
                     b['points'][:len(pts_cam)] = CFG_D.T_base_cam(pts_cam)
                     b['colors'][:len(pts_rgb)] = pts_rgb
-                    b['timestamp'] = r_jpeg.data['timestamp']
+                    b['timestamp'] = timestamp
+            with w_vo.buf() as b:
+                if qi is not None and ti is not None and timestamp is not None:
+                    b['q'] = qi
+                    b['t'] = ti
+                    b['q_acc'] = q
+                    b['t_acc'] = t
+                    b['timestamp'] = timestamp
             with w_depth.buf() as b:
                 if depth_mm is not None:
                     b['depth'] = depth_mm
-                    b['timestamp'] = r_jpeg.data['timestamp']
+                    b['timestamp'] = timestamp
 
 
 if __name__ == "__main__":

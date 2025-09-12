@@ -7,6 +7,9 @@ import numpy as np
 from pathlib import Path
 import threading
 
+import ctypes, ctypes.util
+libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+
 CACHE_LINE = 64
 
 def is_socket_closed(sock: socket.socket) -> bool:
@@ -86,10 +89,10 @@ def _caller_signature():
     f = inspect.stack()[2]
     return f"{os.path.abspath(f.filename)}:{f.lineno}"
 
-def _encode_lock(sig, dtype, period):
+def _encode_lock(sig, dtype, period, priority):
     owner = Path(sys.modules['__main__'].__file__)
     owner = owner.parent.name + '/' + owner.name # TODO: assumes name of app or daemon filename or directory of file
-    return json.dumps({"caller": sig, "dtype": dtype.descr, "period": period, "owner": owner}).encode()
+    return json.dumps({"caller": sig, "dtype": dtype.descr, "period": period, "owner": owner, "priority": priority}).encode()
 
 
 def json_descr_to_dtype(desc):
@@ -114,11 +117,11 @@ def json_descr_to_dtype(desc):
 
 class Writer:
     def __init__(self, name, datatype: Type | List[tuple], keeptime=True):
-        shmtype, period = datatype if isinstance(datatype, tuple) else datatype()
+        shmtype, period, priority = datatype if isinstance(datatype, tuple) else datatype()
         shmdtype = np.dtype(shmtype)
         size = shmdtype.itemsize + CACHE_LINE
         sig = _caller_signature()
-        self._lock: bytes = _encode_lock(sig, shmdtype, period)
+        self._lock: bytes = _encode_lock(sig, shmdtype, period, priority)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
         self._status = Status(name, self._lock)
         self._name = name
@@ -138,6 +141,7 @@ class Writer:
         if self._keeptime:
             # set loop trigger
             self._trigger = [0] # mutable counter
+            Loop.enable_realtime(priority)
             Loop.init(self._trigger)
             Loop.set_ms(period, self._trigger)
 
@@ -284,7 +288,8 @@ class Reader:
         while True:
             s0 = self._seq[0]
             if s0 & 1:          # writer busy → spin
-                time.sleep(0)
+                #time.sleep(0)
+                libc.sched_yield()
                 continue
             s1 = self._seq[0]   # re‑read before copy
             if s1 != s0:        # writer slipped in

@@ -15,9 +15,10 @@ class stereo:
     xfov = 180
     yfov = 83
     f_x = 1500 
+    latency_ms = 100
 
 
-@realtime(ms=70)
+@realtime(ms=70, priority=90)
 def camera_jpeg(buflen):
     return [
         ("bytesused", np.uint32),

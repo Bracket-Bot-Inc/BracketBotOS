@@ -34,8 +34,7 @@ class mapping:
         normalized = logodds.astype(np.float32) / 1000.0
         return np.clip((normalized - mapping.min_logodds/1000.0) / (mapping.max_logodds/1000.0 - mapping.min_logodds/1000.0), 0.0, 1.0)
 
-
-@realtime(ms=100)
+@realtime(ms=150, priority=90)
 def mapping_voxels():
     return [
         ("keys", np.uint64, (mapping.M,)),

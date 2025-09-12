@@ -38,6 +38,7 @@ pkgs.mkShell {
     python311.pkgs.pip
     python311.pkgs.numpy
     python311.pkgs.opencv4
+    python311.pkgs.pyyaml
 
     mesa         # mesa-opencl-icd
     ocl-icd              # ocl-icd-opencl-dev (runtime)
@@ -71,7 +72,6 @@ pkgs.mkShell {
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
       pip install -e ../../..
-      pip install pyyaml
     else
       source venv/bin/activate
       

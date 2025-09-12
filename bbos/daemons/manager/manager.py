@@ -79,13 +79,11 @@ def discover_daemons(root: Path):
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: manager <daemons_dir> [only]")
+        print("Usage: manager <daemons_dir>")
         sys.exit(1)
-    args = type('Args', (), {'daemons_dir': sys.argv[1], 'only': sys.argv[2:]})()
+    args = type('Args', (), {'daemons_dir': sys.argv[1]})()
     procs = list(discover_daemons(Path(args.daemons_dir)))
-    print(args.daemons_dir)
-    if args.only:
-        procs = [proc for proc in procs if proc.name in args.only]
+
     print(f"Managing daemons: {', '.join(p.name for p in procs)}")
 
     running = True
@@ -97,7 +95,6 @@ def main():
     signal.signal(signal.SIGINT, shutdown)
     signal.signal(signal.SIGTERM, shutdown)
 
-    
     def start_proc(proc):
         proc.start()
     

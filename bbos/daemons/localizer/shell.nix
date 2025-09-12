@@ -11,6 +11,7 @@ pkgs.mkShell {
     python311.pkgs.virtualenv
     python311.pkgs.pip
     python311Packages.numpy
+    python311Packages.scipy
     python311Packages.matplotlib
     python311Packages.pybind11
     cmake

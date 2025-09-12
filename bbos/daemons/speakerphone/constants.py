@@ -19,13 +19,13 @@ class speakerphone:
     speaker_chunk_size: int = speaker_sample_rate // 1000 * speaker_ms
     mic_chunk_size: int = mic_sample_rate // 1000 * mic_ms
     mic_volume: float = 1
-    speaker_volume: float = 0.3
+    speaker_volume: float = 0.9
 
 
 # ----------------------------------------------------------------------
 # Types
 # ----------------------------------------------------------------------
-@realtime(ms=10+speakerphone.speaker_ms)
+@realtime(ms=10+speakerphone.speaker_ms, priority=90)
 def speakerphone_speaker():
     return [
         ("audio", np.int16, (speakerphone.speaker_chunk_size, speakerphone.speaker_channels)),  # chunk_size, channels

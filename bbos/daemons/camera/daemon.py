@@ -5,6 +5,8 @@ import select
 import v4l2
 import mmap
 import ctypes
+import time
+import numpy as np
 
 
 def main():
@@ -29,7 +31,7 @@ def main():
 
     # Request buffers
     req = v4l2.v4l2_requestbuffers()
-    req.count = 1
+    req.count = 4
     req.type = v4l2.V4L2_BUF_TYPE_VIDEO_CAPTURE
     req.memory = v4l2.V4L2_MEMORY_MMAP
     fcntl.ioctl(fd, v4l2.VIDIOC_REQBUFS, req)
@@ -62,6 +64,7 @@ def main():
             with w.buf() as b:
                 b['bytesused'] = buf.bytesused
                 b['jpeg'][:buf.bytesused] = mv[:buf.bytesused]
+                b['timestamp'] = np.datetime64(time.time_ns(), 'ns') - np.timedelta64(CFG.latency_ms, 'ms')
     # Cleanup
     fcntl.ioctl(fd, v4l2.VIDIOC_STREAMOFF, buf_type)
     del mv
