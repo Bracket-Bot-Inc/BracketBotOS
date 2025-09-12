@@ -19,6 +19,11 @@ if __name__ == "__main__":
         od.enable_velocity_mode_right()
         od.set_speed_turns_left(0)
         od.set_speed_turns_right(0)
+        od.set_watchdog_timeout(CFG_odrive.watchdog_timeout)
+        od.enable_watchdog_left()
+        od.enable_watchdog_right()
+        od.clear_errors_left()
+        od.clear_errors_right()
         R = CFG_drive.robot_width * 0.5  # half-baseline
         while True:
             if od.has_errors():
@@ -34,6 +39,7 @@ if __name__ == "__main__":
                 vd_l, vd_r = 0, 0
             od.set_speed_mps_left(vd_l)
             od.set_speed_mps_right(vd_r)
+            od.feed_watchdog()
 
             with w_state.buf() as b:
                 b['pos'] = [p_l, p_r]

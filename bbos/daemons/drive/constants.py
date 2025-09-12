@@ -24,6 +24,7 @@ class odrive:
     dir_left: int = 1  # Motor direction for left axis (1 or -1)
     dir_right: int = 1  # Motor direction for right axis (1 or -1)
     torque_bias: float = 0.05
+    watchdog_timeout: int = 1000  # milliseconds
 
 
 # ----------------------------------------------------------------------
