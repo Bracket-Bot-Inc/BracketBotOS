@@ -7,6 +7,7 @@ from odrive.enums import *
 import yaml
 import sys
 import subprocess
+from pathlib import Path
 
 # ANSI escape codes for colors
 BLUE = '\033[94m'
@@ -322,6 +323,7 @@ def test_motor_direction():
     print("Watch each wheel carefully and report the direction it spins.")
     print("Forward = wheel spins to move robot forward")
     print("Backward = wheel spins to move robot backward")
+    Path('config.yaml').unlink(missing_ok=True)
 
     motor_controller = ODriveUART(ODRIVE_CONFIG)
     directions = {'left': 1, 'right': 1}
