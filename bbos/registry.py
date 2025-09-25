@@ -3,6 +3,7 @@ from typing import List
 from inspect import isclass
 from threading import Lock
 import numpy as np
+import difflib
 
 _periods: dict[str, float] = {}
 _types: dict[str, callable] = {}  # functions & callables
@@ -63,17 +64,23 @@ def realtime(ms: int):
 class Type:
     def __init__(self, name: str):
         self._name = name
+        if not self._name in _types:
+            raise ValueError(f"Type {self._name} not found! Maybe you meant one of: {difflib.get_close_matches(self._name, _types.keys())}")
+
+    @property
+    def dtype(self):
+        return _types[self._name]()
 
     def __call__(self, *args, **kwargs):
-        if not self._name in _types:
-            raise ValueError(f"Type {self._name} not found! Select from: {list(_types.keys())}")
         return _types[self._name](*args, **kwargs)+[("timestamp", 'datetime64[ns]')], _periods[self._name] if self._name in _periods else None
 
 
 class Config:
-
     def __init__(self, name: str):
-        cfg = _config[name]
+        if not name in _config:
+            raise ValueError(f"Config {name} not found! Maybe you meant one of: {difflib.get_close_matches(name, _config.keys())}")
+        else:
+            cfg = _config[name]
         for k, v in cfg.__dict__.items():
             if not (k.startswith('__') and k.endswith('__')):
                 setattr(self, k, v)
