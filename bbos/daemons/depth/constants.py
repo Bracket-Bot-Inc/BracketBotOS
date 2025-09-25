@@ -27,7 +27,6 @@ class points:
 @realtime(ms=100)
 def camera_depth():
     return [
-        ("rect", np.float64, (2, depth.height_D, depth.width_D, 3)),
         ("depth", np.uint16, (depth.height_D, depth.width_D)),
     ]
 
@@ -36,6 +35,13 @@ def camera_depth():
 def camera_points():
     return [
         ("num_points", np.int32),
-        ("points", np.float16, (points.num_points, 3)), # Transform convention, z is out of the camera imager and origin is the center of the camera imager
+        ("points", np.float16, (points.num_points, 3)), # Transform convention, z is out of the camera imager and origin is the center of the left camera imager (at the origin of the camera)
         ("colors", np.uint8, (points.num_points, 3)),
+        ("img2pts", np.int32, (depth.width_D * depth.height_D,)), # indexes rectified image to get points
+    ]
+
+@realtime(ms=100)
+def camera_rect():
+    return [
+        ("rect", np.uint8, (depth.height_D, depth.width_D, 3)),
     ]
