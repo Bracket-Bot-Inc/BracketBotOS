@@ -4,32 +4,44 @@ pkgs = import (fetchTarball {
   sha256 = "sha256:1lr1h35prqkd1mkmzriwlpvxcb34kmhc9dnr48gkm8hh089hifmx";
 }) {};
 
-  # ── Mali G610 driver + firmware packaged as a derivation ───────────────
-  maliG610 = pkgs.stdenv.mkDerivation {
-    pname   = "mali-g610-opencl";
-    version = "g6p0";
-
-    # Binary Valhall driver
-    src = pkgs.fetchurl {
-      url = "https://github.com/JeffyCN/mirrors/raw/libmali/lib/aarch64-linux-gnu/libmali-valhall-g610-g6p0-x11-wayland-gbm.so";
-      sha256 = "sha256-Sz+eRzdezb+7EPZUa58zG7vobHTi9h4d13mnrOBnQl8=";  # run `nix-prefetch-url <url>` once
+  # Modular CUDA configuration for JetPack
+  cuda = rec {
+    # Base CUDA path
+    basePath = "/usr/local/cuda-12.6";
+    
+    # CUDA directories
+    binPath = "${basePath}/bin";
+    libPath = "${basePath}/lib64";
+    includePath = "${basePath}/include";
+    pkgConfigPath = "${basePath}/targets/aarch64-linux/lib/pkgconfig";
+    
+    # CUDA executables
+    nvcc = "${binPath}/nvcc";
+    
+    # Environment variables
+    envVars = {
+      CUDA_PATH = basePath;
+      CUDA_HOME = basePath;
+      CUDACXX = nvcc;
+      CUDAHOSTCXX = "g++";
+      PKG_CONFIG_PATH = pkgConfigPath;
+      # PyTorch CUDA settings
+      TORCH_CUDA_ARCH_LIST = "7.2;8.7";  # Jetson Orin Nano compute capability
+      FORCE_CUDA = "1";
     };
-
-    # Firmware blob
-    fw = pkgs.fetchurl {
-      url = "https://github.com/JeffyCN/mirrors/raw/libmali/firmware/g610/mali_csffw.bin";
-      sha256 = "sha256-YP+jdu3sjEAtwO6TV8aF2DXsLg+z0HePMD0IqYAtV/E=";
+    
+    # Library paths for runtime
+    ldLibraryPaths = [
+      libPath
+    ];
+    
+    # Compiler paths
+    compilerPaths = {
+      CPATH = includePath;
+      LIBRARY_PATH = libPath;
     };
-
-    dontUnpack = true;
-
-    installPhase = ''
-      mkdir -p $out/lib $out/lib/firmware $out/etc/OpenCL/vendors
-      cp $src $out/lib/
-      cp $fw  $out/lib/firmware/
-      echo "$out/lib/$(basename $src)" > $out/etc/OpenCL/vendors/mali.icd
-    '';
   };
+
 in
 pkgs.mkShell {
    buildInputs = with pkgs;  [ 
@@ -56,7 +68,20 @@ pkgs.mkShell {
     glibc.dev
   ];
 
+  # Expose CUDA environment variables
+  inherit (cuda.envVars) 
+    CUDA_PATH CUDA_HOME CUDACXX CUDAHOSTCXX 
+    TORCH_CUDA_ARCH_LIST FORCE_CUDA;
+  
+  # Merge CUDA and OpenCL pkg-config paths
+  PKG_CONFIG_PATH = "${cuda.envVars.PKG_CONFIG_PATH}:${pkgs.ocl-icd}/lib/pkgconfig";
+
   shellHook = ''
+    # Add CUDA to PATH
+    export PATH="${cuda.binPath}:$PATH"
+    
+    # Set up library paths for general use (CUDA + system libs)
+    export LD_LIBRARY_PATH="${cuda.libPath}:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.zlib}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.libGL}/lib:$LD_LIBRARY_PATH
@@ -65,7 +90,29 @@ pkgs.mkShell {
     export LD_LIBRARY_PATH=${pkgs.wayland}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.libdrm}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${maliG610}/lib
+    
+    # OpenCL setup
     export OCL_ICD_VENDORS=${maliG610}/etc/OpenCL/vendors
+    
+    # CUDA compiler paths
+    export CPATH="${cuda.includePath}''${CPATH:+:$CPATH}"
+    export LIBRARY_PATH="${cuda.libPath}''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    
+    # Create nvcc wrapper function
+    nvcc() {
+      LD_LIBRARY_PATH="${cuda.libPath}:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu" ${cuda.nvcc} "$@"
+    }
+    export -f nvcc
+    
+    # Sanity checks
+    if [ -x "${cuda.nvcc}" ]; then
+      echo "🟢 Using CUDA from ${cuda.basePath}"
+      nvcc --version >/dev/null 2>&1 && echo "   nvcc is working correctly" || echo "   Note: nvcc may show warnings, but CUDA compilation should work"
+    else
+      echo "🟠 nvcc not found at ${cuda.nvcc} (CUDA may not be available)"
+    fi
+    
+    echo "🟢 OpenCL/Mali G610 configured"
 
     if [ ! -d "venv" ]; then
       python -m venv venv
