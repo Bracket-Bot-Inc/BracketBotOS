@@ -15,6 +15,10 @@ class stereo:
     xfov = 180
     yfov = 83
     f_x = 1500 
+    @staticmethod
+    def split(stereo_img: np.ndarray):
+        assert stereo_img.shape[1] == stereo.width and stereo_img.shape[0] == stereo.height
+        return stereo[:, stereo.width:], stereo[:, :stereo.width] # NOTE: left/right are flipped
 
 
 @realtime(ms=70)
