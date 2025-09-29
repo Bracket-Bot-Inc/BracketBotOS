@@ -18,7 +18,7 @@ class stereo:
     @staticmethod
     def split(stereo_img: np.ndarray):
         assert stereo_img.shape[1] == stereo.width and stereo_img.shape[0] == stereo.height
-        return stereo[:, stereo.width:], stereo[:, :stereo.width] # NOTE: left/right are flipped
+        return stereo_img[:, stereo.width//2:], stereo_img[:, :stereo.width//2] # NOTE: left/right are flipped
 
 
 @realtime(ms=70)
