@@ -6,8 +6,6 @@ import time
 
 cv2.ocl.setUseOpenCL(True)
 
-CALIB_FILE = 'cache/stereo_calibration_fisheye.yaml'
-
 CFG = Config("stereo")
 CFG_D = Config("depth")
 CFG_P = Config("points")
@@ -63,22 +61,6 @@ def disparity_to_camera_points(disp: np.ndarray, Q: np.ndarray):
     return pts_cam, idx
 
 
-def load_calib(path: Path, scale: float):
-    """Load fisheye rectification matrices and return the scaled camera model."""
-    fs = cv2.FileStorage(str(path), cv2.FILE_STORAGE_READ)
-    if not fs.isOpened():
-        raise FileNotFoundError(path)
-
-    mtx_l = fs.getNode("mtx_l").mat();  dist_l = fs.getNode("dist_l").mat()
-    mtx_r = fs.getNode("mtx_r").mat();  dist_r = fs.getNode("dist_r").mat()
-    R1 = fs.getNode("R1").mat();        R2 = fs.getNode("R2").mat()
-    P1 = fs.getNode("P1").mat();        P2 = fs.getNode("P2").mat()
-    Q  = fs.getNode("Q").mat().astype(np.float32)
-    fs.release()
-
-    # Scale translation component to match *scale*
-    Q[:4, 3] *= scale
-    return mtx_l, dist_l, mtx_r, dist_r, R1, R2, P1, P2, Q
 
 def main():
     (
@@ -91,7 +73,9 @@ def main():
         P1_cam,
         P2_cam,
         Q,
-    ) = load_calib(CALIB_FILE, CFG_D.downsample)
+        baseline_m,
+        fx_ds,
+    ) = CFG_D.camera_cal()
 
     # Calculate correct dimensions based on downsampled stereo frame
     # The stereo frame contains both cameras side by side, so width needs to be halved
@@ -120,8 +104,6 @@ def main():
     stereo_bm.setPreFilterCap(CFG_D.pre_filter_cap)
     
     # Pre-calculate stereo parameters
-    baseline_m = abs(P2_cam[0, 3] / P2_cam[0, 0]) / 1000.0
-    fx_ds = P1_cam[0, 0] * CFG_D.downsample
 
     with Reader('camera.jpeg') as r_jpeg, \
             Writer('camera.depth', Type("camera_depth")) as w_depth, \

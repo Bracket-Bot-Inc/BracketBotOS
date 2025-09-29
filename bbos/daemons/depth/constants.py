@@ -1,6 +1,7 @@
 from bbos.registry import *
 from bbos.tf import *
 import numpy as np
+from pathlib import Path
 
 cam = Config('stereo')
 
@@ -16,6 +17,27 @@ class depth:
     pre_filter_cap = 25  # Pre-filter to normalize image brightness (15-63 typical)
     width_D, height_D = (int(cam.width//2 * downsample), int(cam.height * downsample))
     T_base_cam = trans([0,0,1.55]) @ rot([-1,0,0], 90) @ rot([-1,0,0], 36) 
+    calib_path = Path(__file__).parent / "cache" / "stereo_calibration_fisheye.yaml"
+    @staticmethod
+    def camera_cal():
+        import cv2
+        print(depth.calib_path)
+        """Load fisheye rectification matrices and return the scaled camera model."""
+        fs = cv2.FileStorage(str(depth.calib_path), cv2.FILE_STORAGE_READ)
+        if not fs.isOpened():
+            raise FileNotFoundError(depth.calib_path)
+
+        mtx_l = fs.getNode("mtx_l").mat();  dist_l = fs.getNode("dist_l").mat()
+        mtx_r = fs.getNode("mtx_r").mat();  dist_r = fs.getNode("dist_r").mat()
+        R1 = fs.getNode("R1").mat();        R2 = fs.getNode("R2").mat()
+        P1 = fs.getNode("P1").mat();        P2 = fs.getNode("P2").mat()
+        Q  = fs.getNode("Q").mat().astype(np.float32)
+        fs.release()
+        # Scale translation component to match *scale*
+        Q[:4, 3] *= depth.downsample
+        baseline_m = abs(P2[0, 3] / P2[0, 0]) / 1000.0
+        fx_ds = P1[0, 0] * depth.downsample
+        return mtx_l, dist_l, mtx_r, dist_r, R1, R2, P1, P2, Q, baseline_m, fx_ds
 
 @register
 class points:
