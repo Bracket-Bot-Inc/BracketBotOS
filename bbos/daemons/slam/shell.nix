@@ -13,6 +13,8 @@ let
     # CUDA directories
     binPath = "${basePath}/bin";
     libPath = "${basePath}/lib64";
+    # Jetson-specific CUDA library path
+    jetsonLibPath = "${basePath}/targets/aarch64-linux/lib";
     includePath = "${basePath}/include";
     pkgConfigPath = "${basePath}/targets/aarch64-linux/lib/pkgconfig";
     
@@ -34,6 +36,7 @@ let
     # Library paths for runtime
     ldLibraryPaths = [
       libPath
+      jetsonLibPath
     ];
     
     # Compiler paths
@@ -47,6 +50,8 @@ pkgs.mkShell {
   buildInputs = with pkgs; [
     # toolchain
     gcc gnumake cmake pkg-config git git-lfs file
+    # Add gcc12 for newer libstdc++ (GLIBCXX_3.4.30)
+    gcc12
     # python 3.10
     python310 
     python310.pkgs.virtualenv 
@@ -54,6 +59,7 @@ pkgs.mkShell {
     python310.pkgs.wheel
     python310.pkgs.setuptools
     python310.pkgs.numpy
+    python310.pkgs.opencv4
     # system libs for CUDA builds
     zlib libGL glibc glibc.dev libdrm xorg.libX11 xorg.libxcb wayland
   ];
@@ -68,22 +74,29 @@ pkgs.mkShell {
     export PATH="${cuda.binPath}:$PATH"
     # Set up library paths for general use (Nix libraries first for compatibility)
     export LD_LIBRARY_PATH="${cuda.libPath}''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+    # Add Jetson-specific CUDA library path
+    export LD_LIBRARY_PATH="${cuda.jetsonLibPath}:$LD_LIBRARY_PATH"
 
-    export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
+    # Use gcc12's libstdc++ for GLIBCXX_3.4.30 support
+    export LD_LIBRARY_PATH="${pkgs.gcc12.cc.lib}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.zlib}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.libGL}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.xorg.libX11}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.xorg.libxcb}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.wayland}/lib:$LD_LIBRARY_PATH"
     export LD_LIBRARY_PATH="${pkgs.libdrm}/lib:$LD_LIBRARY_PATH"
+    
+    # Add NVIDIA driver libraries for Jetson
+    export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/nvidia:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
 
     # headers for compilers finding CUDA
     export CPATH="${cuda.includePath}''${CPATH:+:$CPATH}"
-    export LIBRARY_PATH="${cuda.libPath}''${LIBRARY_PATH:+:$LIBRARY_PATH}"
+    export LIBRARY_PATH="${cuda.jetsonLibPath}:${cuda.libPath}''${LIBRARY_PATH:+:$LIBRARY_PATH}"
 
     # Create functions for CUDA tools that need system libraries
     nvcc() {
-      LD_LIBRARY_PATH="${cuda.libPath}:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu" ${cuda.nvcc} "$@"
+      LD_LIBRARY_PATH="${cuda.jetsonLibPath}:${cuda.libPath}:/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu" ${cuda.nvcc} "$@"
     }
     export -f nvcc
     
@@ -109,18 +122,7 @@ pkgs.mkShell {
       if [ ! -d "pycuvslam" ]; then
         echo "Cloning pycuvslam repository..."
         git clone https://github.com/NVlabs/pycuvslam.git
-      fi
-      
-      # Ensure Git LFS files are properly downloaded
-      if [ -f "pycuvslam/bin/aarch64/cuvslam/pycuvslam.so" ]; then
-        # Check if .so file is a Git LFS pointer (text file) instead of binary
-        if file pycuvslam/bin/aarch64/cuvslam/pycuvslam.so | grep -q "ASCII text"; then
-          echo "Git LFS files not downloaded. Fetching..."
-          cd pycuvslam && git lfs pull && cd ..
-        fi
-      else
-        echo "Fetching Git LFS files..."
-        cd pycuvslam && git lfs pull && cd ..
+        cd pycuvslam && git lfs fetch --all && cd ..
       fi
       
       echo "Installing pycuvslam..."
