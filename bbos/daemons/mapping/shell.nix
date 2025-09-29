@@ -50,13 +50,7 @@ pkgs.mkShell {
     python311.pkgs.pip
     python311.pkgs.numpy
     python311.pkgs.opencv4
-    python311.pkgs.pyopencl
-
-    mesa         # mesa-opencl-icd
-    ocl-icd              # ocl-icd-opencl-dev (runtime)
-    opencl-headers       # headers split out in Nix
-    clinfo               # diagnostic tool
-    maliG610             # driver + firmware + ICD file
+    python311.pkgs.pycuda
     libdrm
     xorg.libxcb
     wayland
@@ -73,8 +67,8 @@ pkgs.mkShell {
     CUDA_PATH CUDA_HOME CUDACXX CUDAHOSTCXX 
     TORCH_CUDA_ARCH_LIST FORCE_CUDA;
   
-  # Merge CUDA and OpenCL pkg-config paths
-  PKG_CONFIG_PATH = "${cuda.envVars.PKG_CONFIG_PATH}:${pkgs.ocl-icd}/lib/pkgconfig";
+  # CUDA pkg-config path
+  PKG_CONFIG_PATH = "${cuda.envVars.PKG_CONFIG_PATH}";
 
   shellHook = ''
     # Add CUDA to PATH
@@ -89,10 +83,6 @@ pkgs.mkShell {
     export LD_LIBRARY_PATH=${pkgs.xorg.libxcb}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.wayland}/lib:$LD_LIBRARY_PATH
     export LD_LIBRARY_PATH=${pkgs.libdrm}/lib:$LD_LIBRARY_PATH
-    export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:${maliG610}/lib
-    
-    # OpenCL setup
-    export OCL_ICD_VENDORS=${maliG610}/etc/OpenCL/vendors
     
     # CUDA compiler paths
     export CPATH="${cuda.includePath}''${CPATH:+:$CPATH}"
@@ -112,7 +102,7 @@ pkgs.mkShell {
       echo "🟠 nvcc not found at ${cuda.nvcc} (CUDA may not be available)"
     fi
     
-    echo "🟢 OpenCL/Mali G610 configured"
+    echo "🟢 PyCUDA configured"
 
     if [ ! -d "venv" ]; then
       python -m venv venv
