@@ -14,12 +14,12 @@ hotspot = pkgs.writeShellApplication {
     SSID="$host"
     PASSWORD="12345678"
     CONNECTION_NAME="Hotspot"
-    VIRTUAL_IFACE="wlan0-ap"
+    VIRTUAL_IFACE="wlP1p1s0-ap"
   
     create_virtual_interface() {
     if ! sudo iw dev | grep -q "$VIRTUAL_IFACE"; then
         echo "Creating virtual interface $VIRTUAL_IFACE..."
-        sudo iw dev wlan0 interface add "$VIRTUAL_IFACE" type __ap || echo "Failed to add virtual interface. Is iw installed?"
+        sudo iw dev wlP1p1s0 interface add "$VIRTUAL_IFACE" type __ap || echo "Failed to add virtual interface. Is iw installed?"
     else
         echo "Virtual interface $VIRTUAL_IFACE already exists."
     fi

@@ -21,9 +21,9 @@ SERVICES = {
 SERVICE_TEMPLATE = """
 [Unit]
 Description={daemon} Service
-BindsTo=sys-subsystem-net-devices-wlan0.device
+BindsTo=sys-subsystem-net-devices-wlP1p1s0.device
 After=network.target NetworkManager.service
-BindsTo=sys-subsystem-net-devices-wlan0.device
+BindsTo=sys-subsystem-net-devices-wlP1p1s0.device
 
 [Service]
 {user_block}
