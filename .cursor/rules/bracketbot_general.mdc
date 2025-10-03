@@ -14,6 +14,9 @@ alwaysApply: true
     - 'stop' will stop all daemons, 'stop <daemonname>' will stop a specific daemon
     - 'list' will print the running daemons
     - 'logs' will print the logs of each daemon (do 'logs <daemon-or-app-name>' for a specific log)
+    - 'set_state' allows for sending commands to code that reads from @state types (eg triggering slam to save a map)
+    - 'configs' prints all hyperparameters used daemons and the location of where they are found
+    *the source code for these commands are in `BracketBotOS/bbos/daemons/manager/default.nix`
 The users (and you) will mostly write code in @BracketBotApps:
 - There are example apps in @BracketBotApps that show how to use the system. There are correct ways to interface with the daemons.
 - users should not be writing code that directly interfaces with hardware, data used in apps should be acquired by daemons Writers and Readers.

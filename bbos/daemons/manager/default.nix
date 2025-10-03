@@ -6,7 +6,7 @@ pkgs = import (fetchTarball {
 in
 let
   makeWrapper = pkgs.makeWrapper;
-  python = pkgs.python311;
+  python = pkgs.python311.withPackages (ps: [ ps.posix_ipc ps.numpy]); 
   runtimePath = pkgs.lib.makeBinPath [ python pkgs.busybox ];
 
   manager = pkgs.stdenv.mkDerivation {
@@ -153,7 +153,49 @@ stop = pkgs.writeShellApplication {
   '';
 };
 
+set_state = pkgs.writeShellApplication {
+  name = "set_state";
+  text = ''
+  ${python}/bin/python3 -c "import sys, ast; sys.path.insert(0, '/home/bracketbot/BracketBotOS'); \
+  from bbos import Writer, Type; \
+  import time; \
+  val = ast.literal_eval('$4'); \
+  s = \"with Writer('$1', Type('$2')) as w:\\n\tw['$3'] = val\\nprint('Success!')\"; \
+  exec(s)"
+  '';
+};
+
+configs = pkgs.writeShellApplication {
+  name = "configs";
+  text = ''
+  ${python}/bin/python3 - "$@" <<'PY'
+GREEN = "\033[1;32m"
+RESET = "\033[0m"
+import sys, inspect, difflib
+sys.path.insert(0, '/home/bracketbot/BracketBotOS')
+from bbos import Config
+from bbos.registry import all_configs
+d = all_configs()
+if len(sys.argv) > 1:
+    for s in sys.argv:
+        cfg = d.get(s, None)
+        if cfg is None:
+            print(f"Type {s} not found! Maybe you meant one of: {difflib.get_close_matches(s, d.keys())}")
+            continue
+        for k, v in cfg.__dict__.items():
+            if not (k.startswith('__') and k.endswith('__')):
+                print(k, v)
+else:
+    for name, cfg in d.items():
+        print(f"{GREEN}{name} @ {inspect.getfile(cfg)}{RESET}")
+        for k, v in cfg.__dict__.items():
+            if not (k.startswith('__') and k.endswith('__')):
+                print(k, v)
+PY
+  '';
+};
+
 in pkgs.buildEnv {
   name = "manager";
-  paths = [ manager calibrate logs restart stop list];
+  paths = [ manager calibrate logs restart stop list set_state configs];
 }

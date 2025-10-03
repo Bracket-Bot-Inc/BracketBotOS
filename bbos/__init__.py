@@ -18,13 +18,25 @@ _symbols = {
     "AppManager": "bbos.app_manager",
 }
 
+try:
+    m = sys.modules.get("__main__")
+    if m is not None and not hasattr(m, "__file__"):
+        m.__file__ = str((Path.cwd() / "-c").resolve())
+except Exception:
+    pass
+
+__all__ = list(_symbols.keys())
+
+def __dir__():
+    return list(globals().keys()) + list(_symbols.keys())
+
 _collected = False
 def __getattr__(name):
     global _collected
     if name in _symbols:
         if name in ("Config", "Type") and not _collected:
-            _collect_daemon_constants()
             _collected = True
+            _collect_daemon_constants()
         mod = importlib.import_module(_symbols[name])
         val = getattr(mod, name)
         globals()[name] = val  # cache for next time

@@ -91,5 +91,5 @@ def all_types():
     return {k: v() + [("timestamp", 'datetime64[ns]')] for k, v in _types.items()}
 
 
-def all_cfg():
+def all_configs():
     return _config
