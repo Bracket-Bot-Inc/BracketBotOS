@@ -1,29 +1,24 @@
 from bbos import register, realtime
-
-
 import numpy as np
 
 
 @register
 class stereo:
-    rate: int = 20  # Frames per second (camera supports 120fps at 2560x720 MJPG)
-    dev: int = 0  # device id /dev/video<dev>
-    width: int = 2560  # stereo image width
-    height: int = 720  # stereo image height
-    fov_diag = 180  # degrees
-    r = np.sqrt((width / 2)**2 + height**2)
-    xfov = 180
-    yfov = 83
-    f_x = 1500 
+    rate: int = 15  # Frames per second (camera supports 120fps at 2560x720 YUYV)
+    dev: int = 2  # device id /dev/video<dev>
+    width: int = 1280  # stereo image width
+    height: int = 480  # stereo image height
+    fmt: str = "YUYV"
     @staticmethod
     def split(stereo_img: np.ndarray):
         assert stereo_img.shape[1] == stereo.width and stereo_img.shape[0] == stereo.height
-        return stereo_img[:, stereo.width//2:], stereo_img[:, :stereo.width//2] # NOTE: left/right are flipped
-
+        if stereo.fmt == "MJPEG":
+            return stereo_img[:, stereo.width//2:], stereo_img[:, :stereo.width//2] # NOTE: left/right are flipped
+        else:
+            return stereo_img[:, :stereo.width//2], stereo_img[:, stereo.width//2:]
 
 @realtime(ms=70)
-def camera_jpeg(buflen):
+def camera_rgb():
     return [
-        ("bytesused", np.uint32),
-        ("jpeg", np.uint8, buflen),
+        ("rgb", np.uint8, (stereo.height, stereo.width, 3)),
     ]

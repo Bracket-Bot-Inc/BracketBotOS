@@ -11,6 +11,7 @@ pkgs.mkShell {
     python311.pkgs.pip
     python311.pkgs.evdev
     python311Packages.opencv4
+    python311Packages.numpy
     zlib
     libGL
     glibc
