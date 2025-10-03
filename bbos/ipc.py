@@ -9,6 +9,19 @@ import threading
 
 CACHE_LINE = 64
 
+def pretty_bytes(n: int) -> str:
+    # Handle zero
+    if n == 0:
+        return "0 B"
+    # Units
+    units = ["B", "KB", "MB", "GB", "TB", "PB"]
+    i = 0
+    f = float(n)
+    while f >= 1024 and i < len(units) - 1:
+        f /= 1024.0
+        i += 1
+    return f"{f:.2f} {units[i]}"
+
 def is_socket_closed(sock: socket.socket) -> bool:
     try:
         # this will try to read bytes without blocking and also without removing them from buffer (peek only)
@@ -113,10 +126,12 @@ def json_descr_to_dtype(desc):
 
 
 class Writer:
-    def __init__(self, name, datatype: Type | List[tuple], keeptime=True):
+    def __init__(self, name, datatype: Type | List[tuple], keeptime=True, buf_ms=0):
         shmtype, period = datatype if isinstance(datatype, tuple) else datatype()
+        self.N = max(int(np.ceil(buf_ms / period)),1)
         shmdtype = np.dtype(shmtype)
-        size = shmdtype.itemsize + CACHE_LINE
+        size = shmdtype.itemsize * self.N + CACHE_LINE
+        print(f"Writer {name} using {self.N} buffers, size {pretty_bytes(size)}, window {period*self.N}ms", flush=True)
         sig = _caller_signature()
         self._lock: bytes = _encode_lock(sig, shmdtype, period)
         assert len(self._lock) <= Status.PAYLOAD_SIZE, "Lock is too large! Increase PAYLOAD_SIZE or reconfigure your Type"
@@ -140,7 +155,6 @@ class Writer:
             self._trigger = [0] # mutable counter
             Loop.init(self._trigger)
             Loop.set_ms(period, self._trigger)
-
         # create shared memory
         self._shm = posix_ipc.SharedMemory(
             name,
@@ -149,13 +163,15 @@ class Writer:
             size=size)
         self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
                                   mmap.PROT_READ | mmap.PROT_WRITE)
-        self._mapfile.write(b'\x00' * shmdtype.itemsize)
+        self._mapfile.write(b'\x00' * size)
         self._mapfile.flush()
         self._seq = ctypes.c_uint32.from_buffer(self._mapfile, 0)
         self._seq.value = 0
-        self._buf = np.ndarray(1,
+        self._N = ctypes.c_uint32.from_buffer(self._mapfile, 4)
+        self._N.value = self.N
+        self._buf = np.ndarray(self.N,
                                dtype=shmdtype,
-                               buffer=memoryview(self._mapfile)[CACHE_LINE:])
+                            buffer=memoryview(self._mapfile)[CACHE_LINE:])
         self._shm.close_fd()
 
     def __enter__(self):
@@ -167,14 +183,18 @@ class Writer:
         else:
             return True
 
+    @property
+    def idx(self):
+        return (self._seq.value // 2) % self._N.value
+
     @contextlib.contextmanager
     def buf(self):
         self._status.update()
         self._seq.value += 1  # mark as dirty (odd)
         try:
             if self._update():
-                self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
-            yield self._buf[0] if self._update() else np.zeros_like(self._buf[0])
+                self._buf[self.idx]['timestamp'] = np.datetime64(time.time_ns(), 'ns')
+            yield self._buf[self.idx] if self._update() else np.zeros_like(self._buf[self.idx])
         finally:
             self._seq.value += 1  # mark as published (even)
         if self._keeptime:
@@ -184,8 +204,8 @@ class Writer:
         self._status.update()
         if self._update():
             self._seq.value += 1  # odd → readers ignore
-            self._buf[0]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
-            self._buf[0][idx] = data
+            self._buf[self.idx]['timestamp'] = np.datetime64(time.time_ns(), 'ns') 
+            self._buf[self.idx][idx] = data
             self._seq.value += 1  # even → publish
         if self._keeptime:
             Loop.keeptime()
@@ -209,10 +229,10 @@ class Writer:
 
 
 class Reader:
-    def __init__(self, name, keeptime=True):
+    def __init__(self, name, keeptime=True, sync=False):
         self._name = name
         self._readable = False
-        self._valid = False
+        self._sync = sync
         self._tlog = TimeLog(name)
         self._data = None
         self._keeptime = keeptime
@@ -257,12 +277,13 @@ class Reader:
                     self._trigger[0] = 0
                     Loop.set_ms(lock["period"], self._trigger)
                 self._readable = True
-                size = shmdtype.itemsize + CACHE_LINE
                 self._shm = posix_ipc.SharedMemory(self._name)
-                self._mapfile = mmap.mmap(self._shm.fd, size, mmap.MAP_SHARED,
+                self._mapfile = mmap.mmap(self._shm.fd, self._shm.size, mmap.MAP_SHARED,
                                         mmap.PROT_READ)
                 self._seq = memoryview(self._mapfile)[:4].cast('I')
-                self._buf = np.ndarray(1,
+                self._last_seq = self._seq[0] - 2
+                self._N = memoryview(self._mapfile)[4:8].cast('I')
+                self._buf = np.ndarray(self._N[0],
                                     dtype=shmdtype,
                                     buffer=memoryview(self._mapfile)[CACHE_LINE:])
                 self._data = np.zeros_like(self._buf)[0]
@@ -291,8 +312,28 @@ class Reader:
             s1 = self._seq[0]   # re‑read before copy
             if s1 != s0:        # writer slipped in
                 continue
-            data = self._buf[0].copy()
+
+            # compute index using the captured s0
+            if self._sync:
+                # earliest even still in the ring
+                oldest_even = s0 - 2 * (self._N[0] - 1)
+                # next desired even seq (clamped into available window)
+                target_even = min(max(self._last_seq + 2, oldest_even), s0)
+                ridx = ((target_even // 2) - 1) % self._N[0]
+            else:
+                target_even = s0
+                ridx = ((s0 // 2) - 1) % self._N[0]
+
+            data = self._buf[ridx].copy()
+
             if self._seq[0] == s0:       # still identical & even → success
+                backlog = (s0 - self._last_seq) // 2
+                # drop count given ring capacity N
+                dropped = max(0, backlog - self._N[0])
+                if dropped:
+                    print(f"Reader {self._name} dropped {dropped} frames", flush=True)
+                # advance the cursor to the frame we actually returned
+                self._last_seq = target_even
                 return data
 
     @property
