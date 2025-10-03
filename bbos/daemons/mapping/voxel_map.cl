@@ -22,10 +22,12 @@ inline ulong hash64_u64(ulong x, ulong M) {
 __kernel void update_logodds_hash(
     __global const float4 *origins,
     __global const float4 *endpoints,
+    __global const int    *sem_mask, // int32 semantic mask per voxel hit
     const float voxel_size,
     const int   max_steps,
     __global ulong *keys,   // 64-bit keys
     __global int   *values, // int32 log-odds
+    __global int   *key_masks, // int32 mask value at each key
     const ulong M,
     const int  hit_inc,
     const int  miss_dec,
@@ -35,7 +37,7 @@ __kernel void update_logodds_hash(
 ){
     const int gid = get_global_id(0);
     if (gid >= n_valid) return;
-
+    const int mask = sem_mask[gid];
     const float3 o = (float3)(origins[gid].x,  origins[gid].y,  origins[gid].z);
     const float3 e = (float3)(endpoints[gid].x, endpoints[gid].y, endpoints[gid].z);
 
@@ -82,6 +84,7 @@ __kernel void update_logodds_hash(
                                             (ulong)EMPTY_KEY64, (ulong)k);
             if (prev == EMPTY_KEY64 || prev == k) {
                 atomic_add((volatile __global int*)&values[slot], (int)miss_dec);
+                atomic_xchg((volatile __global int*)&key_masks[slot], 0); 
                 break;
             }
         }
@@ -92,21 +95,20 @@ __kernel void update_logodds_hash(
     }
 
     // endpoint with decay
-    {
-        float scale = exp(-L / fmax(decay_lambda, 1e-6f));
-        if (scale < min_hit_scale) scale = min_hit_scale;
-        const int scaled_hit = (int)rint((float)hit_inc * scale);
+    float scale = exp(-L / fmax(decay_lambda, 1e-6f));
+    if (scale < min_hit_scale) scale = min_hit_scale;
+    const int scaled_hit = (int)rint((float)hit_inc * scale);
 
-        const ulong k = voxel_key64(ix_end, iy_end, iz_end);
-        ulong h = hash64_u64(k, M);
-        for (int attempt = 0; attempt < 64; ++attempt) {
-            const ulong slot = (h + (ulong)attempt) % M;
-            const ulong prev = atom_cmpxchg((volatile __global ulong*)&keys[slot],
-                                            (ulong)EMPTY_KEY64, (ulong)k);
-            if (prev == EMPTY_KEY64 || prev == k) {
-                atomic_add((volatile __global int*)&values[slot], (int)scaled_hit);
-                break;
-            }
+    const ulong k = voxel_key64(ix_end, iy_end, iz_end);
+    ulong h = hash64_u64(k, M);
+    for (int attempt = 0; attempt < 64; ++attempt) {
+        const ulong slot = (h + (ulong)attempt) % M;
+        const ulong prev = atom_cmpxchg((volatile __global ulong*)&keys[slot],
+                                        (ulong)EMPTY_KEY64, (ulong)k);
+        if (prev == EMPTY_KEY64 || prev == k) {
+            atomic_add((volatile __global int*)&values[slot], (int)scaled_hit);
+            atomic_xchg((volatile __global int*)&key_masks[slot], mask); 
+            break;
         }
     }
 }

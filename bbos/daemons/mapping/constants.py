@@ -2,6 +2,7 @@ from bbos.registry import *
 from bbos.tf import *
 import numpy as np
 
+CFG_S = Config('segmenter')
 
 @register
 class mapping:
@@ -14,6 +15,15 @@ class mapping:
     min_logodds = miss_dec * 10
     decay_lambda = 0.5
     min_hit = 0.1
+    obstacle_confidence = 0.75
+    @staticmethod
+    def is_obstacle(mapping_voxels: np.ndarray, confidence: float = obstacle_confidence):
+        return mapping.normalize(mapping_voxels.data['logodds']) > confidence
+    
+    @staticmethod
+    def is_object(mapping_voxels: np.ndarray, name: str):
+        return mapping_voxels.data['objects'] == CFG_S.name2mask(name)
+
     @staticmethod
     def unpack_keys(keys: np.ndarray):
         keys = keys.astype(np.uint64).ravel()
@@ -40,4 +50,5 @@ def mapping_voxels():
     return [
         ("keys", np.uint64, (mapping.M,)),
         ("logodds", np.int32, (mapping.M,)),
+        ("key_masks", np.int32, (mapping.M,)),
     ]
