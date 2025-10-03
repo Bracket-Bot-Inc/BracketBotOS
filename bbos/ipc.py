@@ -250,6 +250,8 @@ class Reader:
                 return False
             try:
                 lock = json.loads(self._writer_lock)
+                if lock["period"] is None:
+                    self._keeptime = False
                 shmdtype = np.dtype(json_descr_to_dtype(lock["dtype"]))
                 if self._keeptime:
                     self._trigger[0] = 0
@@ -277,7 +279,7 @@ class Reader:
             self._tlog.log()
         if self._keeptime:
             Loop.keeptime()
-        return not self._keeptime or not stale
+        return not stale
 
     def _read(self):
         """Guarantees a good read"""
