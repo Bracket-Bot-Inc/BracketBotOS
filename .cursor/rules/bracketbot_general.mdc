@@ -2,8 +2,8 @@
 alwaysApply: true
 ---
 
-- This operating system is DietPi
-- This operating system is running on an Orange Pi 5 Pro single board computer
+- This operating system is JetPack 6.0, Ubuntu 22
+- This operating system is running on an Jetson Orin Nano single board computer
 - This single board computer is part of a DIY robot kit called Bracket Bot
 
 - The software that controls this robot is in @BracketBotOS
