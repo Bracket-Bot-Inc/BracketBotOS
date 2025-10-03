@@ -10,6 +10,8 @@ class Operator:
         return Operator(fwd, inv)
     def __call__(self, x):
         x = np.asarray(x, dtype=float)
+        if x.ndim == 2 and x.shape[0] == 1:
+            x = x.squeeze()
         return self.f(x)  # f itself handles (3,) or (N,3)
     def inv(self):
         return Operator(self.f_inv, self.f)
@@ -55,11 +57,11 @@ class Operator:
             y = (R[1, 2] + R[2, 1]) / s
             z = 0.25 * s
         
-        return np.array([w, x, y, z])
+        return np.array([x, y, z, w])
     
     def pos(self):
         """Get the final position after applying transformation to origin."""
-        return self.f(np.array([0., 0., 0.]))
+        return self([0., 0., 0.])
 
 def trans(t):
     t = np.asarray(t, dtype=float)
@@ -95,6 +97,35 @@ def rot(axis, angle_deg):
             return x*c - np.cross(a, x)*s + a*np.dot(a, x)*(1-c)
         elif x.ndim == 2 and x.shape[1] == 3:
             return x*c - np.cross(np.broadcast_to(a, x.shape), x)*s + np.outer(np.dot(x, a), a)*(1-c)
+        else:
+            raise ValueError("Input must be shape (3,) or (N,3)")
+    
+    return Operator(f, f_inv)
+
+def rmat(R):
+    """
+    Rotation operator from a 3x3 rotation matrix.
+    """
+    R = np.asarray(R, dtype=float)
+    if R.shape != (3, 3):
+        raise ValueError("Rotation matrix must be shape (3, 3)")
+    R_inv = R.T
+    
+    def f(x):
+        x = np.asarray(x, dtype=float)
+        if x.ndim == 1:
+            return R @ x
+        elif x.ndim == 2 and x.shape[1] == 3:
+            return (R @ x.T).T
+        else:
+            raise ValueError("Input must be shape (3,) or (N,3)")
+    
+    def f_inv(x):
+        x = np.asarray(x, dtype=float)
+        if x.ndim == 1:
+            return R_inv @ x
+        elif x.ndim == 2 and x.shape[1] == 3:
+            return (R_inv @ x.T).T
         else:
             raise ValueError("Input must be shape (3,) or (N,3)")
     
