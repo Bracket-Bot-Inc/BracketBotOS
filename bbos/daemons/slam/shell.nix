@@ -59,7 +59,6 @@ pkgs.mkShell {
     python310.pkgs.wheel
     python310.pkgs.setuptools
     python310.pkgs.numpy
-    python310.pkgs.scipy
     python310.pkgs.opencv4
     # system libs for CUDA builds
     zlib libGL glibc glibc.dev libdrm xorg.libX11 xorg.libxcb wayland
@@ -119,15 +118,15 @@ pkgs.mkShell {
       pip install -e ../../..
       echo "Virtual environment created and activated."
       
-      # Install PyTorch for Jetson (CUDA-enabled)
-      echo "Installing PyTorch with CUDA support for Jetson..."
-      pip install torch torchvision --index-url https://download.pytorch.org/whl/cu126
+      # Install pycuvslam if not already present
+      if [ ! -d "pycuvslam" ]; then
+        echo "Cloning pycuvslam repository..."
+        git clone https://github.com/NVlabs/pycuvslam.git
+        cd pycuvslam && git lfs fetch --all && cd ..
+      fi
       
-      # Install LightGlue and SuperPoint
-      echo "Installing LightGlue..."
-      pip install lightglue
-      
-      echo "All dependencies installed."
+      echo "Installing pycuvslam..."
+      pip install -e pycuvslam/bin/aarch64
     else
       source venv/bin/activate
       echo "Virtual environment activated. Use 'deactivate' to exit."
